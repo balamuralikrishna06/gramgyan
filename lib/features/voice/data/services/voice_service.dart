@@ -1,70 +1,60 @@
-import 'package:speech_to_text/speech_to_text.dart';
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 
-/// Service to handle Speech-to-Text operations using the device's native capabilities.
+/// Service to handle Audio Recording for Sarvam Backend.
 class VoiceService {
-  final SpeechToText _speech = SpeechToText();
-  bool _isInitialized = false;
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  bool _isRecording = false;
 
-  /// Initializes the speech recognition service.
-  /// Returns true if successful, false otherwise.
+  /// Initializes the recorder (checks permissions).
   Future<bool> initialize() async {
-    if (_isInitialized) return true;
     try {
-      _isInitialized = await _speech.initialize(
-        onError: (val) => debugPrint('VoiceService Error: $val'),
-        onStatus: (val) => debugPrint('VoiceService Status: $val'),
-      );
-      return _isInitialized;
+      return await _audioRecorder.hasPermission();
     } catch (e) {
       debugPrint('VoiceService Initialization Failed: $e');
       return false;
     }
   }
 
-  /// Starts listening to the microphone and returns the recognized text via callback.
-  /// 
-  /// [onResult] Callback function that receives the recognized text.
-  /// [locale] Optional locale ID (e.g., 'en_IN', 'ta_IN', 'hi_IN').
-  Future<void> startListening({
-    required Function(String) onResult,
-    String? locale = 'en_IN',
-  }) async {
-    if (!_isInitialized) {
-      bool success = await initialize();
-      if (!success) return;
-    }
-
+  /// Starts recording to a temporary file.
+  Future<void> startRecording() async {
     try {
-      await _speech.listen(
-        onResult: (result) {
-          if (result.finalResult || result.recognizedWords.isNotEmpty) {
-            onResult(result.recognizedWords);
-          }
-        },
-        localeId: locale,
-        cancelOnError: true,
-        partialResults: true,
-        listenMode: ListenMode.dictation,
-      );
+      if (await _audioRecorder.hasPermission()) {
+        final tempDir = await getTemporaryDirectory();
+        final filePath = '${tempDir.path}/temp_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        
+        // Start recording to file
+        await _audioRecorder.start(const RecordConfig(), path: filePath);
+        _isRecording = true;
+        debugPrint('Started recording to $filePath');
+      }
     } catch (e) {
-      debugPrint('VoiceService Start Listening Failed: $e');
+      debugPrint('VoiceService Start Recording Failed: $e');
     }
   }
 
-  /// Stops listening to the microphone.
-  Future<void> stopListening() async {
-    if (_speech.isListening) {
-      await _speech.stop();
+  /// Stops recording and returns the file path.
+  Future<String?> stopRecording() async {
+    try {
+      if (_isRecording) {
+        final path = await _audioRecorder.stop();
+        _isRecording = false;
+        debugPrint('Stopped recording, file saved at $path');
+        return path;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('VoiceService Stop Recording Failed: $e');
+      return null;
     }
   }
 
-  /// Checks if the service is currently listening.
-  bool get isListening => _speech.isListening;
-
-  /// Returns a list of available locales (E.g. for language selection UI).
-  Future<List<LocaleName>> getLocales() async {
-    if (!_isInitialized) await initialize();
-    return await _speech.locales();
+  /// Checks if the service is currently recording.
+  bool get isRecording => _isRecording;
+  
+  void dispose() {
+    _audioRecorder.dispose();
   }
 }

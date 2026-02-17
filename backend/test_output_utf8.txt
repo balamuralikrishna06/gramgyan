@@ -1,0 +1,8 @@
+Created dummy file: test.wav
+Testing Sarvam STT with URL: https://api.sarvam.ai/speech-to-text
+Headers: dict_keys(['api-subscription-key'])
+Data: {'model': 'saarika:v2', 'language_code': 'ta-IN'}
+Status Code: 400
+Response Body: {"detail":"Model 'saarika:v2' has been deprecated. Please use 'saarika:v2.5' instead."}
+Exception: Client error '400 Bad Request' for url 'https://api.sarvam.ai/speech-to-text'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400

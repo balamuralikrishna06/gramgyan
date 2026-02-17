@@ -28,8 +28,8 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   bool _isSubmitting = false; 
   int _seconds = 0;
   String _transcript = '';
-  String? _detectedLanguage;
-  // _audioFile removed as we use client-side STT now
+  String _translation = '';
+  String? _detectedLanguage = 'ta-IN'; // Defaulting to Tamil for checks
 
   // Form Fields
   String _selectedCrop = 'Tomato';
@@ -170,19 +170,17 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
             // ── Voice Recorder ──
             if (!_hasResult)
               VoiceRecorderWidget(
-                onResult: (text) {
-                  // Live update (optional) or final result
-                  setState(() => _transcript = text);
+                onResult: (transcript, translation) {
+                  setState(() {
+                    _transcript = transcript;
+                    _translation = translation;
+                    _hasResult = true;
+                  });
                 },
                 onRecordingStopped: () {
-                   // When stopped, we show the result form
-                   if (_transcript.isNotEmpty) {
-                     setState(() {
-                       _hasResult = true;
-                     });
-                   }
+                   // Logic moved to onResult for processing completion
                 },
-                initialLocale: 'en_IN', // Default, could be dynamic based on user profile
+                initialLocale: 'ta_IN', 
               ),
 
             // ── AI Transcript Card & Form ──
@@ -224,6 +222,29 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                               _transcript,
                               style: AppTextStyles.bodyMedium.copyWith(height: 1.5),
                             ),
+                            if (_translation.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              const Divider(),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.translate_rounded,
+                                      size: 18, color: AppColors.secondary),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'English Translation',
+                                    style: AppTextStyles.titleMedium,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _translation,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                    height: 1.5,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              ),
+                            ],
                           ],
                         ),
                       ),

@@ -1,0 +1,3 @@
+Testing Sarvam TTS with URL: https://api.sarvam.ai/text-to-speech
+Status Code: 400
+Response Body: {"error":{"message":"Validation Error(s):\n- speaker: Input should be 'anushka', 'abhilash', 'manisha', 'vidya', 'arya', 'karun', 'hitesh', 'aditya', 'ritu', 'priya', 'neha', 'rahul', 'pooja', 'rohan', 'simran', 'kavya', 'amit', 'dev', 'ishita', 'shreya', 'ratan', 'varun', 'manan', 'sumit', 'roopa', 'kabir', 'aayan', 'shubh', 'ashutosh', 'advait', 'amelia', 'sophia', 'anand', 'tanya', 'tarun', 'sunny', 'mani', 'gokul', 'vijay', 'shruti', 'suhani', 'mohit', 'kavitha', 'rehan', 'soham' or 'rupali'\n- model: Input should be 'bulbul:v2', 'bulbul:v3-beta' or 'bulbul:v3'","code":"invalid_request_error","request_id":"20260217_ef513a3a-1622-4e15-9ce3-0c260f5a6d3f"}}
