@@ -27,8 +27,8 @@ class SarvamProcessResponse {
 }
 
 class SarvamApiService {
-  // Use ngrok URL for remote mobile testing
-  static const String _baseUrl = 'https://cadence-remedial-collegiately.ngrok-free.dev/api/v1/speech';
+  // Use Render Production URL
+  static const String _baseUrl = 'https://gramgyan.onrender.com/api/v1/speech';
 
   Future<SarvamProcessResponse> processAudio(String filePath) async {
     final uri = Uri.parse('$_baseUrl/process');
