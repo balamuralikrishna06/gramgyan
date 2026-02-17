@@ -27,11 +27,11 @@ async def speech_to_text(audio_file_path: str, language_code: str = "ta-IN") -> 
                 result = response.json()
                 return result.get("transcript", "")
             except httpx.HTTPStatusError as e:
-                print(f"Error calling Sarvam STT: {e.response.text}")
+                print(f"Error calling Sarvam STT: {e.response.status_code} - {e.response.text}")
                 # Re-raise with the detail message if possible, or just log
                 raise Exception(f"Sarvam API Error: {e.response.text}") from e
             except Exception as e:
-                print(f"An error occurred: {e}")
+                print(f"An error occurred in STT: {e}")
                 raise e
 
 async def translate_text(text: str, source_language: str = "ta-IN", target_language: str = "en-IN") -> str:
@@ -59,10 +59,10 @@ async def translate_text(text: str, source_language: str = "ta-IN", target_langu
             result = response.json()
             return result.get("translated_text", "")
         except httpx.HTTPStatusError as e:
-            print(f"Error calling Sarvam Translation: {e.response.text}")
+            print(f"Error calling Sarvam Translation: {e.response.status_code} - {e.response.text}")
             raise Exception(f"Sarvam API Error: {e.response.text}") from e
         except Exception as e:
-            print(f"An error occurred: {e}")
+            print(f"An error occurred in Translation: {e}")
             raise e
 
 async def text_to_speech(text: str, language_code: str = "ta-IN") -> bytes:
