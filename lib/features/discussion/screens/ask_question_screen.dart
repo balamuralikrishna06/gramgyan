@@ -7,7 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../shared/widgets/animated_mic_button.dart';
+import '../../../core/theme/app_text_styles.dart';
+import '../../voice/presentation/widgets/voice_recorder_widget.dart';
 import '../../home/presentation/providers/knowledge_providers.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../auth/domain/models/auth_state.dart';
@@ -22,13 +23,10 @@ class AskQuestionScreen extends ConsumerStatefulWidget {
 }
 
 class _AskQuestionScreenState extends ConsumerState<AskQuestionScreen> {
-  bool _isRecording = false;
-  bool _isProcessing = false;
   bool _hasTranscript = false;
   bool _isSubmitting = false;
-  int _seconds = 0;
-  Timer? _timer;
   String _transcript = '';
+  String _translation = '';
 
   String _selectedCrop = 'Tomato';
   String _selectedCategory = 'Crops';
@@ -52,52 +50,7 @@ class _AskQuestionScreenState extends ConsumerState<AskQuestionScreen> {
 
   static const _categories = ['Crops', 'Livestock', 'Soil', 'Weather'];
 
-  void _toggleRecording() {
-    if (_isRecording) {
-      _stopRecording();
-    } else {
-      _startRecording();
-    }
-  }
 
-  void _startRecording() {
-    setState(() {
-      _isRecording = true;
-      _isProcessing = false;
-      _hasTranscript = false;
-      _seconds = 0;
-      _transcript = '';
-    });
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _seconds++);
-    });
-  }
-
-  void _stopRecording() {
-    _timer?.cancel();
-    setState(() {
-      _isRecording = false;
-      _isProcessing = true;
-    });
-
-    // Simulate AI transcription
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      final transcripts = AppConstants.mockTranscripts;
-      setState(() {
-        _isProcessing = false;
-        _hasTranscript = true;
-        _transcript =
-            transcripts[DateTime.now().millisecond % transcripts.length];
-      });
-    });
-  }
-
-  String get _timerDisplay {
-    final m = (_seconds ~/ 60).toString().padLeft(2, '0');
-    final s = (_seconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
 
   Future<void> _submitQuestion() async {
     // Confirmation dialog
@@ -169,11 +122,7 @@ class _AskQuestionScreenState extends ConsumerState<AskQuestionScreen> {
     context.pop();
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -347,65 +296,20 @@ class _AskQuestionScreenState extends ConsumerState<AskQuestionScreen> {
 
                     const SizedBox(height: 24),
 
-                    // ── Mic Button ──
-                    Center(
-                      child: AnimatedMicButton(
-                        isRecording: _isRecording,
-                        onTap: _isProcessing ? () {} : _toggleRecording,
+                    // ── Voice Recorder ──
+                    if (!_hasTranscript)
+                      Center(
+                        child: VoiceRecorderWidget(
+                          onResult: (transcript, translation) {
+                            setState(() {
+                              _transcript = transcript;
+                              _translation = translation;
+                              _hasTranscript = true;
+                            });
+                          },
+                          initialLocale: 'ta_IN',
+                        ),
                       ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // ── Timer / Status ──
-                    Center(
-                      child: _isRecording
-                          ? Text(
-                              _timerDisplay,
-                              style: AppTextStyles.displayMedium.copyWith(
-                                color: AppColors.error,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            )
-                          : _isProcessing
-                              ? Column(
-                                  children: [
-                                    SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        valueColor: AlwaysStoppedAnimation(
-                                          isDark
-                                              ? AppColors.primaryLight
-                                              : AppColors.primary,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Processing with AI...',
-                                      style:
-                                          AppTextStyles.bodySmall.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : !_hasTranscript
-                                  ? Text(
-                                      'Tap the mic to describe your problem',
-                                      style:
-                                          AppTextStyles.bodySmall.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
-                                    )
-                                  : const SizedBox.shrink(),
-                    ),
 
                     const SizedBox(height: 16),
 
@@ -464,6 +368,34 @@ class _AskQuestionScreenState extends ConsumerState<AskQuestionScreen> {
                                 height: 1.5,
                               ),
                             ),
+                            if (_translation.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              const Divider(),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.translate_rounded,
+                                      size: 14, color: AppColors.secondary),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'English Translation',
+                                    style: AppTextStyles.titleSmall.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _translation,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -478,6 +410,7 @@ class _AskQuestionScreenState extends ConsumerState<AskQuestionScreen> {
                                 setState(() {
                                   _hasTranscript = false;
                                   _transcript = '';
+                                  _translation = '';
                                 });
                               },
                               icon: const Icon(Icons.refresh_rounded,
