@@ -63,6 +63,7 @@ async def translate(request: TranslateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/process")
+@router.post("/process-audio")
 async def process_audio(file: UploadFile = File(...), source_language: str = "ta-IN", target_language: str = "en-IN"):
     """
     Full workflow: Upload Audio -> STT -> Translate -> Return JSON.
