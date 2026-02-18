@@ -8,6 +8,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/services/local_storage_service.dart';
+import 'core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,14 @@ void main() async {
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.anonKey,
   );
+
+  // Initialize Notification Service
+  try {
+    final notificationService = NotificationService(Supabase.instance.client);
+    await notificationService.init();
+  } catch (e) {
+    debugPrint('Notification Service missing or failed: $e');
+  }
 
   // Lock portrait orientation for rural-friendly experience
   await SystemChrome.setPreferredOrientations([

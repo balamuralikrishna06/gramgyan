@@ -1,14 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../auth/domain/models/auth_state.dart';
 
 import '../models/question.dart';
 import '../models/solution.dart';
-import '../repository/mock_discussion_repository.dart';
+import '../repository/supabase_discussion_repository.dart';
 
-/// Singleton repository instance.
-final discussionRepositoryProvider = Provider<MockDiscussionRepository>((ref) {
-  return MockDiscussionRepository();
+/// Supabase-backed discussion repository.
+final discussionRepositoryProvider = Provider<SupabaseDiscussionRepository>((ref) {
+  return SupabaseDiscussionRepository(Supabase.instance.client);
 });
 
 /// Discussion status tab filter: 'All', 'Questions', 'Solved', 'Verified'.

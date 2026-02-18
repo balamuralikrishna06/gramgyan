@@ -10,7 +10,7 @@ class ReportRepository {
 
   ReportRepository(this._client, this._geminiService);
 
-  /// Creates a new report in the Supabase 'reports' table (for Questions/Issues).
+  /// Creates a new report in the Supabase 'knowledge_posts' table (for Questions/Issues).
   Future<Report> createReport({
     required String userId,
     required double latitude,
@@ -37,20 +37,16 @@ class ReportRepository {
         audioUrl = _client.storage.from('knowledge-audio').getPublicUrl(fileName);
       }
 
-      // 2. Insert into 'reports' table
-      final response = await _client.from('reports').insert({
+      // 2. Insert into 'knowledge_posts' table
+      final response = await _client.from('knowledge_posts').insert({
         'user_id': userId,
         'latitude': latitude,
         'longitude': longitude,
-        'crop': crop,
-        'category': category,
-        'transcript': transcript,
-        'translated_transcript': translatedText, // Can be passed or null
+        'original_text': transcript,
+        'english_text': translatedText,
+        'language': 'Unknown',
         'audio_url': audioUrl,
-        'ai_generated': false,
         'created_at': DateTime.now().toIso8601String(),
-        'type': type, 
-        'status': 'open',
       }).select().single();
 
       final reportId = response['id'];
@@ -123,6 +119,57 @@ class ReportRepository {
 
     } catch (e) {
       throw Exception('Failed to create knowledge post: $e');
+    }
+  }
+
+  /// Searches for similar knowledge posts using embeddings.
+  Future<List<Map<String, dynamic>>> searchSimilarKnowledge(String queryText) async {
+    try {
+      final embedding = await _geminiService.generateQueryEmbedding(queryText);
+      if (embedding == null) return [];
+
+      final List<dynamic> response = await _client.rpc(
+        'match_knowledge',
+        params: {
+          'query_embedding': embedding,
+          'match_threshold': 0.78, // Higher threshold for more accurate matching
+          'match_count': 3,
+        },
+      );
+
+      return response.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Error searching knowledge: $e');
+      return [];
+    }
+  }
+
+  /// Creates a question record when no matching knowledge is found.
+  Future<void> createQuestion({
+    required String userId,
+    required String originalText,
+    String? englishText,
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      List<double>? embedding;
+      if (englishText != null && englishText.isNotEmpty) {
+        embedding = await _geminiService.generateEmbedding(englishText);
+      }
+
+      await _client.from('questions').insert({
+        'user_id': userId,
+        'original_text': originalText,
+        'english_text': englishText,
+        'embedding': embedding,
+        'latitude': latitude,
+        'longitude': longitude,
+        'status': 'open',
+      });
+    } catch (e) {
+      debugPrint('Error creating question: $e');
+      // Non-blocking error, but good to log
     }
   }
 }

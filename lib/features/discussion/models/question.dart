@@ -101,36 +101,38 @@ class Question {
   factory Question.fromJson(Map<String, dynamic> json) {
     return Question(
       id: json['id'] as String,
-      authorId: json['authorId'] as String? ?? 'unknown', // Default for backward compat
-      farmerName: json['farmerName'] as String,
-      location: json['location'] as String,
-      crop: json['crop'] as String,
+      authorId: json['user_id'] as String? ?? json['authorId'] as String? ?? 'unknown',
+      farmerName: json['farmer_name'] as String? ?? json['farmerName'] as String? ?? 'Farmer',
+      location: json['location'] as String? ?? 'Unknown',
+      crop: json['crop'] as String? ?? 'General',
       category: json['category'] as String? ?? 'Crops',
-      transcript: json['transcript'] as String,
-      audioUrl: json['audioUrl'] as String,
+      transcript: json['original_text'] as String? ?? json['transcript'] as String? ?? '',
+      audioUrl: json['audio_url'] as String? ?? json['audioUrl'] as String? ?? '',
       status: QuestionStatus.fromString(json['status'] as String? ?? 'open'),
-      replyCount: json['replyCount'] as int? ?? 0,
+      replyCount: json['reply_count'] as int? ?? json['replyCount'] as int? ?? 0,
       karma: json['karma'] as int? ?? 0,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : (json['createdAt'] != null
+              ? DateTime.parse(json['createdAt'] as String)
+              : DateTime.now()),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'authorId': authorId,
-      'farmerName': farmerName,
+      'user_id': authorId,
+      'farmer_name': farmerName,
       'location': location,
       'crop': crop,
       'category': category,
-      'transcript': transcript,
-      'audioUrl': audioUrl,
+      'original_text': transcript,
+      'audio_url': audioUrl,
       'status': status.name,
-      'replyCount': replyCount,
+      'reply_count': replyCount,
       'karma': karma,
-      'createdAt': createdAt.toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
     };
   }
 }
