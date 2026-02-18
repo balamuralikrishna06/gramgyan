@@ -5,14 +5,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class GeminiService {
   // TODO: Replace with your actual API Key
-  static const String _apiKey = 'AIzaSyAUwlFsvW0HY3AbH0yPl_SLpMY0ez595To'; 
+  static const String apiKey = 'AIzaSyBYgustRBEbIhxjeiu88rbIyaNSeDHca_0'; 
   
   late final GenerativeModel _model;
 
   GeminiService() {
     _model = GenerativeModel(
       model: 'gemini-1.5-flash',
-      apiKey: _apiKey,
+      apiKey: apiKey,
     );
   }
 
