@@ -41,4 +41,34 @@ class Solution {
       createdAt: createdAt ?? this.createdAt,
     );
   }
+
+  factory Solution.fromJson(Map<String, dynamic> json) {
+    return Solution(
+      id: json['id'] as String,
+      questionId: json['question_id'] as String? ?? json['questionId'] as String? ?? '',
+      farmerName: json['farmer_name'] as String? ?? json['farmerName'] as String? ?? 'Farmer',
+      transcript: json['answer_text'] as String? ?? json['transcript'] as String? ?? '',
+      audioUrl: json['audio_url'] as String? ?? json['audioUrl'] as String? ?? '',
+      karma: json['karma'] as int? ?? 0,
+      isVerified: json['is_verified'] as bool? ?? json['isVerified'] as bool? ?? false,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : (json['createdAt'] != null
+              ? DateTime.parse(json['createdAt'] as String)
+              : DateTime.now()),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'question_id': questionId,
+      'farmer_name': farmerName,
+      'answer_text': transcript,
+      'audio_url': audioUrl,
+      'karma': karma,
+      'is_verified': isVerified,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
 }

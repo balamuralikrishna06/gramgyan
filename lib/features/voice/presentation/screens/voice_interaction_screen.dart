@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -9,7 +10,7 @@ import '../../../auth/domain/models/auth_state.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../map/presentation/providers/map_providers.dart';
 import '../../../../core/providers/service_providers.dart';
-import '../../../map/presentation/screens/solution_screen.dart';
+import '../../../discussion/providers/discussion_providers.dart';
 import '../widgets/voice_recorder_widget.dart';
 
 enum VoiceMode { ask, share }
@@ -30,6 +31,11 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   String? _transcript;
   String? _translation;
   String? _audioPath;
+
+  // State for matched answer
+  String? _matchedAnswer;
+  String? _tamilAnswer;
+  int _matchSimilarity = 0;
 
   void _handleVoiceResult(String transcript, String translation, String? audioPath) {
     if (transcript.trim().isEmpty) {
@@ -75,24 +81,101 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
       if (_selectedMode == VoiceMode.ask) {
         // --- ASK FLOW ---
-        // Use createReport for Questions
-        final report = await repo.createReport(
-          userId: userId,
-          latitude: lat,
-          longitude: lng,
-          crop: 'General', // Default
-          category: 'General', // Default
-          audioFile: File(_audioPath!), 
-          manualTranscript: _transcript!,
-          translatedText: _translation, 
-          type: 'question',
-        );
-        
+        // 1. Generate embedding for the question
+        setState(() => _loadingMessage = 'Searching knowledge base...');
+        final geminiService = ref.read(geminiServiceProvider);
+        final queryText = _translation ?? _transcript!;
+        final matches = await repo.searchSimilarKnowledge(queryText);
+
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => SolutionScreen(reportId: report.id)),
-        );
+
+        // 2. Route based on similarity score
+        final hasGoodMatch = matches.isNotEmpty && 
+            (matches.first['similarity'] as num? ?? 0) >= 0.78;
+
+        if (hasGoodMatch) {
+          // ✅ MATCH FOUND → Translate to Tamil + speak via Sarvam TTS
+          final matchData = matches.first;
+          final answerText = matchData['english_text'] as String? ?? 
+                             matchData['original_text'] as String? ?? 
+                             'Solution found in knowledge base.';
+          final similarity = ((matchData['similarity'] as num?) ?? 0) * 100;
+
+          // Translate answer to Tamil using Sarvam
+          setState(() => _loadingMessage = 'Translating to Tamil...');
+          final sarvam = ref.read(sarvamApiServiceProvider);
+          final tamilAnswer = await sarvam.translateText(
+            answerText,
+            sourceLanguage: 'en-IN',
+            targetLanguage: 'ta-IN',
+          );
+
+          setState(() {
+            _isProcessing = false;
+            _loadingMessage = null;
+            _matchedAnswer = answerText;
+            _tamilAnswer = tamilAnswer;
+            _matchSimilarity = similarity.toInt();
+          });
+
+          // Speak the Tamil answer via flutter_tts
+          final tts = ref.read(textToSpeechServiceProvider);
+          await tts.speak(tamilAnswer, language: 'ta-IN');
+
+        } else {
+          // ❌ NO MATCH → Post question to discussion
+          setState(() => _loadingMessage = 'Posting to community...');
+          
+          final discussionRepo = ref.read(discussionRepositoryProvider);
+          final farmerName = (authState is AuthAuthenticated)
+              ? (authState.displayName ?? 'Farmer')
+              : 'Farmer';
+
+          // Upload audio for the question
+          String? audioUrl;
+          if (_audioPath != null) {
+            try {
+              final supabase = Supabase.instance.client;
+              final fileName = '${userId}_q_${DateTime.now().millisecondsSinceEpoch}.m4a';
+              await supabase.storage.from('knowledge-audio').upload(
+                fileName,
+                File(_audioPath!),
+                fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+              );
+              audioUrl = supabase.storage.from('knowledge-audio').getPublicUrl(fileName);
+            } catch (e) {
+              debugPrint('Audio upload for question failed: $e');
+            }
+          }
+
+          // Generate embedding for the question
+          final embedding = await geminiService.generateEmbedding(queryText);
+
+          await discussionRepo.addQuestion(
+            transcript: _transcript!,
+            englishText: _translation,
+            crop: 'General',
+            category: 'General',
+            authorId: userId,
+            farmerName: farmerName,
+            location: 'Unknown',
+            audioUrl: audioUrl,
+            latitude: lat,
+            longitude: lng,
+            embedding: embedding,
+          );
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Question posted to community for help! 🌾'),
+              backgroundColor: AppColors.secondary,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+          context.go('/home');
+        }
 
       } else {
         // --- SHARE KNOWLEDGE FLOW ---
@@ -135,10 +218,15 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   }
 
   void _reset() {
+    // Stop TTS if playing
+    try { ref.read(textToSpeechServiceProvider).stop(); } catch (_) {}
     setState(() {
       _transcript = null;
       _translation = null;
       _audioPath = null;
+      _matchedAnswer = null;
+      _tamilAnswer = null;
+      _matchSimilarity = 0;
       _isProcessing = false;
     });
   }
@@ -268,6 +356,118 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                             Text(
                               _translation!,
                               style: AppTextStyles.bodyLarge.copyWith(height: 1.5),
+                            ),
+                          ],
+
+                          // ── Matched Answer Card ──
+                          if (_matchedAnswer != null) ...[
+                            const SizedBox(height: 24),
+                            const Divider(),
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.check_circle_rounded, 
+                                        size: 22, color: AppColors.success),
+                                      const SizedBox(width: 8),
+                                      Text('Answer Found!', 
+                                        style: AppTextStyles.titleSmall.copyWith(
+                                          color: AppColors.success,
+                                          fontWeight: FontWeight.bold,
+                                        )),
+                                      const Spacer(),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.success.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text('$_matchSimilarity% match',
+                                          style: AppTextStyles.labelSmall.copyWith(
+                                            color: AppColors.success,
+                                            fontWeight: FontWeight.w600,
+                                          )),
+                                      ),
+                                    ],
+                                  ),
+
+                                  // Tamil Answer (primary)
+                                  if (_tamilAnswer != null) ...[
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        const Text('🇮🇳', style: TextStyle(fontSize: 16)),
+                                        const SizedBox(width: 6),
+                                        Text('தமிழ் பதில்', 
+                                          style: AppTextStyles.labelMedium.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          )),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _tamilAnswer!,
+                                      style: AppTextStyles.bodyLarge.copyWith(height: 1.6),
+                                    ),
+                                  ],
+
+                                  // English Answer (secondary)
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    children: [
+                                      const Text('🌐', style: TextStyle(fontSize: 16)),
+                                      const SizedBox(width: 6),
+                                      Text('English', 
+                                        style: AppTextStyles.labelMedium.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey,
+                                        )),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _matchedAnswer!,
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      height: 1.5,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+
+                                  // Listen Again button
+                                  const SizedBox(height: 16),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        final tts = ref.read(textToSpeechServiceProvider);
+                                        tts.speak(
+                                          _tamilAnswer ?? _matchedAnswer!,
+                                          language: 'ta-IN',
+                                        );
+                                      },
+                                      icon: const Icon(Icons.volume_up_rounded),
+                                      label: const Text('Listen in Tamil 🔊'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.success,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ],

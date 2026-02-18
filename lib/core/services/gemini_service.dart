@@ -56,8 +56,7 @@ class GeminiService {
     }
     
     try {
-      print('Gemini Embedding: Generating for text length ${text.length}...');
-      // Use the embedding model with the valid API key
+      print('Gemini Embedding: Generating DOCUMENT embedding for text length ${text.length}...');
       final embeddingModel = GenerativeModel(
         model: 'gemini-embedding-001',
         apiKey: apiKey, 
@@ -72,6 +71,30 @@ class GeminiService {
     }
   }
 
+  /// Generates a query embedding optimized for searching against stored documents.
+  /// Uses TaskType.retrievalQuery for accurate cosine similarity matching.
+  Future<List<double>?> generateQueryEmbedding(String text) async {
+    if (text.isEmpty) {
+      print('Gemini Query Embedding: Text is empty');
+      return null;
+    }
+    
+    try {
+      print('Gemini Query Embedding: Generating QUERY embedding for text length ${text.length}...');
+      final embeddingModel = GenerativeModel(
+        model: 'gemini-embedding-001',
+        apiKey: apiKey, 
+      );
+      final content = Content.text(text);
+      final result = await embeddingModel.embedContent(content, taskType: TaskType.retrievalQuery);
+      print('Gemini Query Embedding: Success. Vector length: ${result.embedding.values.length}');
+      return result.embedding.values;
+    } catch (e) {
+      print('Gemini Query Embedding Error: $e');
+      return null;
+    }
+  }
+
   /// Translates text to the target language
   Future<String> translateText(String text, String targetLang) async {
     try {
@@ -81,6 +104,17 @@ class GeminiService {
     } catch (e) {
       // Return original text on failure to avoid blocking
       return text;
+    }
+  }
+
+  /// Generates a simple agricultural answer for a given prompt
+  Future<String> generateAnswer(String query) async {
+    try {
+      final prompt = 'Provide a clear, simple agricultural solution for this farmer question:\n"$query"\nKeep the answer concise and easy to understand for a farmer.';
+      final response = await _model.generateContent([Content.text(prompt)]);
+      return response.text?.trim() ?? 'I could not generate an answer at this time.';
+    } catch (e) {
+      return 'I could not generate an answer at this time due to an error.';
     }
   }
 }

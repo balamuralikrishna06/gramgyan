@@ -6,11 +6,11 @@ class MapRepository {
 
   MapRepository(this._supabase);
 
-  /// Fetches all reports from the 'reports' table.
+  /// Fetches all reports from the 'knowledge_posts' table.
   Future<List<Report>> getReports() async {
     try {
       final response = await _supabase
-          .from('reports')
+          .from('knowledge_posts')
           .select()
           .order('created_at', ascending: false);
 
@@ -21,10 +21,10 @@ class MapRepository {
     }
   }
 
-  /// Subscribes to real-time updates for the 'reports' table.
+  /// Subscribes to real-time updates for the 'knowledge_posts' table.
   Stream<List<Report>> subscribeToReports() {
     return _supabase
-        .from('reports')
+        .from('knowledge_posts')
         .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
         .map((data) => data.map((json) => Report.fromJson(json)).toList());

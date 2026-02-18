@@ -8,6 +8,7 @@ import '../services/speech_service.dart';
 import '../services/translation_service.dart';
 import '../services/embedding_service.dart';
 import '../services/storage_service.dart';
+import '../services/notification_service.dart';
 import '../services/knowledge_service.dart';
 
 final audioRecorderServiceProvider = Provider<AudioRecorderService>((ref) {
@@ -42,6 +43,10 @@ final embeddingServiceProvider = Provider<EmbeddingService>((ref) {
 
 final storageServiceProvider = Provider<StorageService>((ref) {
   return StorageService(Supabase.instance.client);
+});
+
+final notificationServiceProvider = Provider<NotificationService>((ref) {
+  return NotificationService(Supabase.instance.client);
 });
 
 final knowledgeServiceProvider = Provider<KnowledgeService>((ref) {
