@@ -70,7 +70,7 @@ class ReportRepository {
         'category': category,
         'transcript': transcript,
         'translated_transcript': null, // Will be filled by process-report
-        'original_language': originalLanguage,
+        // 'original_language': originalLanguage, // Column missing in DB
         'audio_url': audioUrl,
         'ai_generated': false,
         'created_at': DateTime.now().toIso8601String(),
