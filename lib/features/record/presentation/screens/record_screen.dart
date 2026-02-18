@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -29,7 +30,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   int _seconds = 0;
   String _transcript = '';
   String _translation = '';
-  String? _detectedLanguage = 'ta-IN'; // Defaulting to Tamil for checks
+  String? _audioPath; // Added audio path state
 
   // Form Fields
   String _selectedCrop = 'Tomato';
@@ -74,8 +75,9 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         crop: _selectedCrop,
         category: _selectedCategory,
         // Using manualTranscript from client-side STT
-        audioFile: null, 
+        audioFile: _audioPath != null ? File(_audioPath!) : null, 
         manualTranscript: _transcript,
+        translatedText: _translation, // Pass translated text
         type: _isAskMode ? 'question' : 'knowledge',
       );
 
@@ -170,10 +172,15 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
             // ── Voice Recorder ──
             if (!_hasResult)
               VoiceRecorderWidget(
+<<<<<<< HEAD
+                onResult: (transcript, translation, audioPath) {
+=======
                 onResult: (transcript, translation, filePath) {
+>>>>>>> 69046862e01d616c9863ab909dd2270b7503547a
                   setState(() {
                     _transcript = transcript;
                     _translation = translation;
+                    _audioPath = audioPath;
                     _hasResult = true;
                   });
                 },

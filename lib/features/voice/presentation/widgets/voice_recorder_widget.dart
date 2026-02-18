@@ -7,7 +7,11 @@ import '../../../../core/providers/service_providers.dart';
 import '../../../../core/services/sarvam_api_service.dart';
 
 class VoiceRecorderWidget extends ConsumerStatefulWidget {
+<<<<<<< HEAD
+  final Function(String transcript, String translation, String? audioPath) onResult;
+=======
   final Function(String transcript, String translation, String filePath) onResult;
+>>>>>>> 69046862e01d616c9863ab909dd2270b7503547a
   final VoidCallback? onRecordingStopped;
   final String initialLocale;
 

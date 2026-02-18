@@ -185,9 +185,9 @@ class _ReportDetailsSheetState extends ConsumerState<ReportDetailsSheet> {
              Text(report.transcript, style: Theme.of(context).textTheme.bodyMedium),
              const SizedBox(height: 8),
              const Text("English Translation:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
-             Text(report.translatedTranscript ?? report.transcript, style: Theme.of(context).textTheme.bodyMedium),
+             Text(report.englishText ?? report.translatedTranscript ?? report.transcript, style: Theme.of(context).textTheme.bodyMedium),
           ] else ...[
-             Text(report.transcript.isNotEmpty ? report.transcript : 'No description provided.', 
+             Text((report.englishText ?? report.translatedTranscript ?? report.transcript).isNotEmpty ? (report.englishText ?? report.translatedTranscript ?? report.transcript) : 'No description provided.', 
                   style: Theme.of(context).textTheme.bodyMedium),
           ],
 

@@ -61,7 +61,7 @@ class AppShell extends StatelessWidget {
           child: NavigationBar(
             selectedIndex: index,
             onDestinationSelected: (i) => _onNavTap(context, i),
-            destinations: const [
+            destinations: [
               NavigationDestination(
                 icon: Icon(Icons.home_outlined),
                 selectedIcon: Icon(Icons.home_rounded),
@@ -91,6 +91,7 @@ class AppShell extends StatelessWidget {
     );
   }
 }
+
 
 
 

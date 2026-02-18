@@ -41,11 +41,11 @@ class Report {
       longitude: (json['longitude'] as num).toDouble(),
       crop: json['crop'] as String? ?? 'Unknown Crop',
       category: json['category'] as String? ?? 'General',
-      transcript: json['transcript'] as String? ?? '',
+      transcript: json['original_text'] as String? ?? '', // Mapped from DB 'original_text'
       translatedTranscript: json['translated_transcript'] as String?,
-      originalLanguage: json['original_language'] as String?,
+      originalLanguage: json['language'] as String?, // Mapped from DB 'language'
       audioUrl: json['audio_url'] as String?,
-      aiGenerated: json['ai_generated'] as bool? ?? false,
+      aiGenerated: (json['ai_generated'] as bool?) ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
       englishText: json['english_text'] as String?,
       type: json['type'] as String? ?? 'question',
@@ -61,9 +61,9 @@ class Report {
       'longitude': longitude,
       'crop': crop,
       'category': category,
-      'transcript': transcript,
+      'original_text': transcript, // Mapped to DB 'original_text'
       'translated_transcript': translatedTranscript,
-      'original_language': originalLanguage,
+      'language': originalLanguage, // Mapped to DB 'language'
       'audio_url': audioUrl,
       'ai_generated': aiGenerated,
       'created_at': createdAt.toIso8601String(),

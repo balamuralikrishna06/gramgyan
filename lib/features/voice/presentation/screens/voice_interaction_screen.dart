@@ -26,12 +26,17 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   bool _isProcessing = false;
   String? _loadingMessage;
 
+<<<<<<< HEAD
+  void _handleVoiceResult(String transcript, String translation, String? audioPath) async {
+    // If empty transcript, do nothing or show error
+=======
   // State for result display
   String? _transcript;
   String? _translation;
   String? _audioPath;
 
   void _handleVoiceResult(String transcript, String translation, String filePath) async {
+>>>>>>> 69046862e01d616c9863ab909dd2270b7503547a
     if (transcript.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not hear anything. Please try again.')),
@@ -88,6 +93,36 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
         debugPrint('Location error: $e');
       }
 
+<<<<<<< HEAD
+      final repo = ref.read(reportRepositoryProvider);
+
+      // We need these for the report. For now, defaulting crop/category or we could add a quick selector later.
+      // The prompt says "Simplify... Remove any modal... Directly navigate...".
+      // It doesn't explicitly mention Crop/Category selection in this new flow.
+      // However, `createReport` requires them. I will use defaults "General" or similar, 
+      // OR specifically for "Ask", the SolutionScreen might handle it?
+      // Re-reading `RecordScreen`: it has dropdowns.
+      // The master prompt says: "Store transcript + audio... Save mode (ask/share) in database".
+      // It doesn't mention selecting crop/category in the `VoiceInteractionScreen`.
+      // I will use default values to keep the flow frictionless as requested.
+      // Or maybe 'Unknown' so it can be tagged later.
+      
+      final report = await repo.createReport(
+        userId: userId,
+        latitude: lat,
+        longitude: lng,
+        crop: 'General', // Default
+        category: 'General', // Default
+        audioFile: audioPath != null ? File(audioPath) : null, 
+        manualTranscript: transcript,
+        translatedText: translation, // Pass Sarvam translation
+        type: _selectedMode == VoiceMode.ask ? 'question' : 'knowledge',
+      );
+
+      if (!mounted) return;
+
+=======
+>>>>>>> 69046862e01d616c9863ab909dd2270b7503547a
       if (_selectedMode == VoiceMode.ask) {
         // --- ASK FLOW ---
         // Create Report via ReportRepository (existing)

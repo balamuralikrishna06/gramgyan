@@ -37,86 +37,110 @@ class _SolutionScreenState extends ConsumerState<SolutionScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _supabase
-            .from('solutions')
-            .stream(primaryKey: ['id'])
-            .eq('report_id', widget.reportId),
+        // stream: _supabase
+        //     .from('solutions')
+        //     .stream(primaryKey: ['id'])
+        //     .eq('report_id', widget.reportId),
+        // builder: (context, snapshot) {
+        //   // Temporary placeholder since 'solutions' table is missing
+        //   return Center(
+        //     child: Padding(
+        //       padding: const EdgeInsets.all(24.0),
+        //       child: Column(
+        //         mainAxisAlignment: MainAxisAlignment.center,
+        //         children: [
+        //           Icon(Icons.construction, size: 48, color: AppColors.primary),
+        //           SizedBox(height: 16),
+        //           Text(
+        //             'Solution feature is currently under development.',
+        //             textAlign: TextAlign.center,
+        //             style: AppTextStyles.bodyLarge,
+        //           ),
+        //           SizedBox(height: 8),
+        //           Text(
+        //             'We are working on the Knowledge Share table first.',
+        //             textAlign: TextAlign.center,
+        //             style: AppTextStyles.bodyMedium.copyWith(color: AppColors.onSurfaceVariantLight),
+        //           ),
+        //         ],
+        //       ),
+        //     ),
+        //   );
+        // },
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _supabase
+            .from('knowledge_posts')
+            .select()
+            .eq('id', widget.reportId)
+            .single(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return _buildLoadingState();
           }
+          
+          if (snapshot.hasError) {
+             return Center(child: Text('Error: ${snapshot.error}'));
+          }
 
-          final solution = snapshot.data!.first;
-          final solutionText = solution['solution_text'] as String;
-          final isAi = solution['ai_generated'] as bool;
+          if (!snapshot.hasData) {
+            return const Center(child: Text('Post not found'));
+          }
 
-          return Padding(
+          final post = snapshot.data!;
+          final transcript = post['original_text'] as String? ?? 'No transcript available';
+          final translation = post['english_text'] as String? ?? 'No translation available';
+          final audioUrl = post['audio_url'] as String?;
+
+          return SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── AI Badge ──
-                if (isAi)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                if (audioUrl != null) ...[
+                   Container(
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.auto_awesome, size: 16, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Text(
-                          'AI Generated Solution',
-                          style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary),
-                        ),
+                        Icon(Icons.audiotrack, color: AppColors.primary),
+                        SizedBox(width: 12),
+                        Expanded(child: Text('Audio Recording', style: AppTextStyles.labelLarge)),
+                        // TODO: Add audio player widget here if needed
                       ],
                     ),
-                  ),
-                const SizedBox(height: 24),
+                   ),
+                   const SizedBox(height: 24),
+                ],
 
-                // ── Solution Text ──
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Text(
-                      solutionText,
-                      style: AppTextStyles.bodyLarge.copyWith(height: 1.6),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // ── TTS Button ──
-                SizedBox(
+                Text('Transcript', style: AppTextStyles.titleMedium),
+                const SizedBox(height: 8),
+                Container(
                   width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      if (_isPlaying) {
-                        await tts.stop();
-                        setState(() => _isPlaying = false);
-                      } else {
-                        setState(() => _isPlaying = true);
-                        await tts.speak(solutionText);
-                        setState(() => _isPlaying = false);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    icon: Icon(_isPlaying ? Icons.stop_rounded : Icons.volume_up_rounded),
-                    label: Text(_isPlaying ? 'Stop Listening' : 'Listen to Solution'),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
                   ),
+                  child: Text(transcript, style: AppTextStyles.bodyLarge),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                Text('English Translation', style: AppTextStyles.titleMedium),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+                  ),
+                  child: Text(translation, style: AppTextStyles.bodyLarge),
                 ),
               ],
             ),
