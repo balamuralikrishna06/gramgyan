@@ -300,7 +300,7 @@ class _AskQuestionScreenState extends ConsumerState<AskQuestionScreen> {
                     if (!_hasTranscript)
                       Center(
                         child: VoiceRecorderWidget(
-                          onResult: (transcript, translation) {
+                          onResult: (transcript, translation, filePath) {
                             setState(() {
                               _transcript = transcript;
                               _translation = translation;
