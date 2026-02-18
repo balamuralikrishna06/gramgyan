@@ -26,17 +26,12 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   bool _isProcessing = false;
   String? _loadingMessage;
 
-<<<<<<< HEAD
-  void _handleVoiceResult(String transcript, String translation, String? audioPath) async {
-    // If empty transcript, do nothing or show error
-=======
   // State for result display
   String? _transcript;
   String? _translation;
   String? _audioPath;
 
-  void _handleVoiceResult(String transcript, String translation, String filePath) async {
->>>>>>> 69046862e01d616c9863ab909dd2270b7503547a
+  void _handleVoiceResult(String transcript, String translation, String? audioPath) {
     if (transcript.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not hear anything. Please try again.')),
@@ -48,26 +43,9 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
     setState(() {
       _transcript = transcript;
       _translation = translation;
-      _audioPath = filePath;
+      _audioPath = audioPath;
       _isProcessing = false;
     });
-
-    // If Mode is ASK, maybe we auto-submit? 
-    // The previous logic auto-submitted for Ask.
-    // But for Share, we generally want review.
-    // The prompt says: "On Share Knowledge page: Show transcript preview... Show Submit button".
-    // For "Ask", it usually goes to SolutionScreen instantly.
-    
-    if (_selectedMode == VoiceMode.ask) {
-      // For Ask, let's keep the existing flow of auto-navigating to SolutionScreen (or creating report)
-      // BUT, since we changed the flow to verification-mode earlier, 
-      // I should revert to the "Auto Submit if Ask" logic OR keep it unified.
-      // The prompt specifically details "Share Knowledge".
-      // Let's make "Ask" also require a tap? No, farmers want speed.
-      // I'll add a "Continue" button for Ask, or just Auto-submit.
-      // Let's essentially keep them consistent: Review -> Submit.
-      // It's safer.
-    }
   }
 
   Future<void> _submit() async {
@@ -83,8 +61,8 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       final userId = (authState is AuthAuthenticated) ? authState.userId : 'anon';
       
       // Get location
-      double? lat;
-      double? lng;
+      double lat = 0;
+      double lng = 0;
       try {
         final position = await ref.read(userLocationProvider.future);
         lat = position.latitude;
@@ -93,54 +71,20 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
         debugPrint('Location error: $e');
       }
 
-<<<<<<< HEAD
       final repo = ref.read(reportRepositoryProvider);
 
-      // We need these for the report. For now, defaulting crop/category or we could add a quick selector later.
-      // The prompt says "Simplify... Remove any modal... Directly navigate...".
-      // It doesn't explicitly mention Crop/Category selection in this new flow.
-      // However, `createReport` requires them. I will use defaults "General" or similar, 
-      // OR specifically for "Ask", the SolutionScreen might handle it?
-      // Re-reading `RecordScreen`: it has dropdowns.
-      // The master prompt says: "Store transcript + audio... Save mode (ask/share) in database".
-      // It doesn't mention selecting crop/category in the `VoiceInteractionScreen`.
-      // I will use default values to keep the flow frictionless as requested.
-      // Or maybe 'Unknown' so it can be tagged later.
-      
-      final report = await repo.createReport(
-        userId: userId,
-        latitude: lat,
-        longitude: lng,
-        crop: 'General', // Default
-        category: 'General', // Default
-        audioFile: audioPath != null ? File(audioPath) : null, 
-        manualTranscript: transcript,
-        translatedText: translation, // Pass Sarvam translation
-        type: _selectedMode == VoiceMode.ask ? 'question' : 'knowledge',
-      );
-
-      if (!mounted) return;
-
-=======
->>>>>>> 69046862e01d616c9863ab909dd2270b7503547a
       if (_selectedMode == VoiceMode.ask) {
         // --- ASK FLOW ---
-        // Create Report via ReportRepository (existing)
-        // Since we are re-enabling this, we need to uncomment ReportRepository usage?
-        // Wait, task 441 said "Disable ReportRepository calls for now".
-        // But now we are implementing the full feature. I should re-enable it for "Ask" if desired.
-        // Or maybe just focus on Share Knowledge?
-        // Use ReportRepository for Ask.
-        
-        final repo = ref.read(reportRepositoryProvider);
-         final report = await repo.createReport(
+        // Use createReport for Questions
+        final report = await repo.createReport(
           userId: userId,
-          latitude: lat ?? 0,
-          longitude: lng ?? 0,
-          crop: 'General',
-          category: 'General',
-          audioFile: null, // We have the file, but createReport might handle uploading differently or we use audioUrl
+          latitude: lat,
+          longitude: lng,
+          crop: 'General', // Default
+          category: 'General', // Default
+          audioFile: File(_audioPath!), 
           manualTranscript: _transcript!,
+          translatedText: _translation, 
           type: 'question',
         );
         
@@ -152,31 +96,14 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
       } else {
         // --- SHARE KNOWLEDGE FLOW ---
-        
-        // 1. Generate Embedding
-        setState(() => _loadingMessage = 'Analyzing knowledge... 🧠');
-        final embeddingService = ref.read(embeddingServiceProvider);
-        final embedding = await embeddingService.generateEmbedding(_translation ?? _transcript!);
-
-        // 2. Upload Audio
-        setState(() => _loadingMessage = 'Uploading voice... ☁️');
-        final storageService = ref.read(storageServiceProvider);
-        final audioUrl = await storageService.uploadAudio(File(_audioPath!));
-
-        // 3. Save to DB
-        setState(() => _loadingMessage = 'Sharing with community... 🌱');
-        final knowledgeService = ref.read(knowledgeServiceProvider);
-        await knowledgeService.createPost(
-          originalText: _transcript!,
-          englishText: _translation ?? _transcript!, // Fallback if no translation
-          language: 'Unknown', // We should ideally get this from Sarvam response, but VoiceRecorderWidget didn't pass it. 
-                               // Sarvam response HAS 'source_language'.
-                               // I'll fix VoiceRecorderWidget to pass sourceLanguage too or just say 'Detected'.
-                               // For now, hardcode or assume 'ta-IN' or 'Detected'.
-          audioUrl: audioUrl,
+        // Use createKnowledgePost for Sharing (Handles Embeddings)
+        await repo.createKnowledgePost(
+          userId: userId,
           latitude: lat,
           longitude: lng,
-          embedding: embedding, 
+          audioFile: File(_audioPath!),
+          manualTranscript: _transcript!,
+          translatedText: _translation, 
         );
 
         if (!mounted) return;

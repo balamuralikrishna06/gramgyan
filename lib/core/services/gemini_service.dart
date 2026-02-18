@@ -4,12 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/app_constants.dart';
 
 class GeminiService {
-  // TODO: Replace with your actual API Key
-<<<<<<< HEAD
-  static const String _apiKey = AppConstants.geminiApiKey; 
-=======
-  static const String apiKey = 'AIzaSyBYgustRBEbIhxjeiu88rbIyaNSeDHca_0'; 
->>>>>>> 69046862e01d616c9863ab909dd2270b7503547a
+  // Using the verified working API Key
+  static const String apiKey = 'AIzaSyDE4R7kKKi7R0vSvVPtltNJBMLTcqGEiGI'; 
   
   late final GenerativeModel _model;
 
@@ -61,10 +57,10 @@ class GeminiService {
     
     try {
       print('Gemini Embedding: Generating for text length ${text.length}...');
-      // Use the embedding model
+      // Use the embedding model with the valid API key
       final embeddingModel = GenerativeModel(
         model: 'gemini-embedding-001',
-        apiKey: 'AIzaSyDE4R7kKKi7R0vSvVPtltNJBMLTcqGEiGI', 
+        apiKey: apiKey, 
       );
       final content = Content.text(text);
       final result = await embeddingModel.embedContent(content, taskType: TaskType.retrievalDocument);
@@ -78,14 +74,11 @@ class GeminiService {
 
   /// Translates text to the target language
   Future<String> translateText(String text, String targetLang) async {
-    // Removed mock check
-
     try {
       final prompt = 'Translate the following text to $targetLang:\n\n$text';
       final response = await _model.generateContent([Content.text(prompt)]);
       return response.text?.trim() ?? text;
     } catch (e) {
-      // throw Exception('Failed to translate text with Gemini: $e');
       // Return original text on failure to avoid blocking
       return text;
     }

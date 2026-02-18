@@ -7,7 +7,7 @@ class EmbeddingService {
 
   EmbeddingService() {
     _embeddingModel = GenerativeModel(
-      model: 'text-embedding-004', 
+      model: 'gemini-embedding-001', 
       apiKey: GeminiService.apiKey, // Use the shared key
     );
   }
