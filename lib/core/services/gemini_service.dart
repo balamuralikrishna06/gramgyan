@@ -5,14 +5,18 @@ import '../constants/app_constants.dart';
 
 class GeminiService {
   // TODO: Replace with your actual API Key
+<<<<<<< HEAD
   static const String _apiKey = AppConstants.geminiApiKey; 
+=======
+  static const String apiKey = 'AIzaSyBYgustRBEbIhxjeiu88rbIyaNSeDHca_0'; 
+>>>>>>> 69046862e01d616c9863ab909dd2270b7503547a
   
   late final GenerativeModel _model;
 
   GeminiService() {
     _model = GenerativeModel(
       model: 'gemini-1.5-flash',
-      apiKey: _apiKey,
+      apiKey: apiKey,
     );
   }
 

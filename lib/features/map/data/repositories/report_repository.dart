@@ -64,6 +64,7 @@ class ReportRepository {
       }
 
       // 3. Insert Report
+<<<<<<< HEAD
         // 3. Generate Embedding (Gemini)
         List<double>? embedding;
         try {
@@ -95,6 +96,23 @@ class ReportRepository {
           // 'type': type, // Removed: Likely missing
           // 'status': 'open', // Removed: Likely missing
         }).select().single();
+=======
+      final response = await _client.from('reports').insert({
+        'user_id': userId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'crop': crop,
+        'category': category,
+        'transcript': transcript,
+        'translated_transcript': null, // Will be filled by process-report
+        // 'original_language': originalLanguage, // Column missing in DB
+        'audio_url': audioUrl,
+        'ai_generated': false,
+        'created_at': DateTime.now().toIso8601String(),
+        'type': type, 
+        'status': 'open',
+      }).select().single();
+>>>>>>> 69046862e01d616c9863ab909dd2270b7503547a
 
       final reportId = response['id'];
 
