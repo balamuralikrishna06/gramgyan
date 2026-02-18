@@ -9,7 +9,7 @@ class EmbeddingService {
 
   EmbeddingService() {
     _embeddingModel = GenerativeModel(
-      model: 'text-embedding-004', // Or 'embedding-001'
+      model: 'embedding-001',
       apiKey: _apiKey,
     );
   }
