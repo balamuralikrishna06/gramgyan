@@ -7,7 +7,7 @@ import '../../../../core/providers/service_providers.dart';
 import '../../../../core/services/sarvam_api_service.dart';
 
 class VoiceRecorderWidget extends ConsumerStatefulWidget {
-  final Function(String transcript, String translation) onResult;
+  final Function(String transcript, String translation, String filePath) onResult;
   final VoidCallback? onRecordingStopped;
   final String initialLocale;
 
@@ -86,7 +86,7 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
         final response = await sarvamService.processAudio(filePath);
         
         if (mounted) {
-          widget.onResult(response.transcript, response.translation);
+          widget.onResult(response.transcript, response.translation, filePath);
           setState(() {
             _statusText = "Done!";
             _isProcessing = false;
