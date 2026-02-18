@@ -170,7 +170,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
             // ── Voice Recorder ──
             if (!_hasResult)
               VoiceRecorderWidget(
-                onResult: (transcript, translation) {
+                onResult: (transcript, translation, filePath) {
                   setState(() {
                     _transcript = transcript;
                     _translation = translation;
