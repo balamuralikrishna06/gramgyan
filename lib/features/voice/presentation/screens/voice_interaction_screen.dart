@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,7 +25,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   VoiceMode _selectedMode = VoiceMode.ask;
   bool _isProcessing = false;
 
-  void _handleVoiceResult(String transcript, String translation) async {
+  void _handleVoiceResult(String transcript, String translation, String? audioPath) async {
     // If empty transcript, do nothing or show error
     if (transcript.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -69,7 +70,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
         longitude: lng,
         crop: 'General', // Default
         category: 'General', // Default
-        audioFile: null, 
+        audioFile: audioPath != null ? File(audioPath) : null, 
         manualTranscript: transcript,
         translatedText: translation, // Pass Sarvam translation
         type: _selectedMode == VoiceMode.ask ? 'question' : 'knowledge',

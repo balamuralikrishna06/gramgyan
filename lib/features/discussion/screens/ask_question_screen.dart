@@ -300,10 +300,11 @@ class _AskQuestionScreenState extends ConsumerState<AskQuestionScreen> {
                     if (!_hasTranscript)
                       Center(
                         child: VoiceRecorderWidget(
-                          onResult: (transcript, translation) {
+                          onResult: (transcript, translation, audioPath) {
                             setState(() {
                               _transcript = transcript;
                               _translation = translation;
+                              // Note: audioPath is available but MockDiscussionRepository doesn't support it yet
                               _hasTranscript = true;
                             });
                           },

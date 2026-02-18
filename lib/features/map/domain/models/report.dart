@@ -45,7 +45,7 @@ class Report {
       translatedTranscript: json['translated_transcript'] as String?,
       originalLanguage: json['language'] as String?, // Mapped from DB 'language'
       audioUrl: json['audio_url'] as String?,
-      aiGenerated: json['ai_generated'] as bool? ?? false,
+      aiGenerated: (json['ai_generated'] as bool?) ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
       englishText: json['english_text'] as String?,
       type: json['type'] as String? ?? 'question',
