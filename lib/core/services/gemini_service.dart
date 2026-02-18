@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:mime/mime.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../constants/app_constants.dart';
 
 class GeminiService {
   // TODO: Replace with your actual API Key
-  static const String _apiKey = 'AIzaSyAUwlFsvW0HY3AbH0yPl_SLpMY0ez595To'; 
+  static const String _apiKey = AppConstants.geminiApiKey; 
   
   late final GenerativeModel _model;
 

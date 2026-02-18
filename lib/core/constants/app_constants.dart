@@ -113,4 +113,9 @@ class AppConstants {
     {'id': 'crop_specialist', 'label': 'Crop Specialist', 'icon': '🌾'},
     {'id': 'community_helper', 'label': 'Community Helper', 'icon': '🤝'},
   ];
+
+  // ── API Keys & Endpoints ──
+  static const String sarvamApiKey = 'sarvam ai-sk_1m08qk56_DYpiv9SX2uLX7l7gF8SdTpD3'; // TODO: Move to .env for production
+  static const String geminiApiKey = 'AIzaSyBYgustRBEbIhxjeiu88rbIyaNSeDHca_0'; // TODO: Move to .env for production
+  static const String backendUrl = 'https://gramgyan.onrender.com/';
 }

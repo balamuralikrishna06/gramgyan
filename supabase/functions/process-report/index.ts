@@ -13,7 +13,7 @@ serve(async (req) => {
     }
 
     try {
-        const { report_id, transcript, type } = await req.json()
+        const { report_id, original_text, type, translated_text } = await req.json()
 
         // Initialize Clients
         const supabase = createClient(
@@ -24,10 +24,14 @@ serve(async (req) => {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
         const embeddingModel = genAI.getGenerativeModel({ model: "embedding-001" })
 
-        // 1. Translate to English
-        const translationPrompt = `Translate the following agricultural text to clear English. Return ONLY the English translation.\n\n${transcript}`
-        const translationResult = await model.generateContent(translationPrompt)
-        const englishText = translationResult.response.text().trim()
+        // 1. Translate to English (if not provided)
+        let englishText = translated_text;
+
+        if (!englishText) {
+            const translationPrompt = `Translate the following agricultural text to clear English. Return ONLY the English translation.\n\n${original_text}`
+            const translationResult = await model.generateContent(translationPrompt)
+            englishText = translationResult.response.text().trim()
+        }
 
         // 2. Generate Embedding
         const embeddingResult = await embeddingModel.embedContent(englishText)
@@ -35,7 +39,7 @@ serve(async (req) => {
 
         // 3. Update Report with English Text & Embedding
         await supabase
-            .from('reports')
+            .from('knowledge_posts')
             .update({
                 english_text: englishText,
                 embedding: embedding,

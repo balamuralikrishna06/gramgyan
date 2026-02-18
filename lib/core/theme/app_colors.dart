@@ -31,6 +31,7 @@ class AppColors {
   static const Color cardGreenLight = Color(0xFFE4EBD5);
   static const Color onSurfaceLight = Color(0xFF2C2C2C);
   static const Color onSurfaceVariantLight = Color(0xFF6B6B5E);
+  static const Color textSecondary = onSurfaceVariantLight;
 
   // ── Surface (Dark) ──
   static const Color surfaceDark = Color(0xFF1A1C16);

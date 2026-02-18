@@ -71,6 +71,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
         category: 'General', // Default
         audioFile: null, 
         manualTranscript: transcript,
+        translatedText: translation, // Pass Sarvam translation
         type: _selectedMode == VoiceMode.ask ? 'question' : 'knowledge',
       );
 

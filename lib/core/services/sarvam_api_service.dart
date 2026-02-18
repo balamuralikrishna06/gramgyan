@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import '../constants/app_constants.dart';
 
 class SarvamProcessResponse {
   final String transcript;
@@ -27,8 +27,8 @@ class SarvamProcessResponse {
 }
 
 class SarvamApiService {
-  // Use Render Production URL
-  static const String _baseUrl = 'https://gramgyan.onrender.com/api/v1/speech';
+  // Use Render Production URL from Constants
+  static const String _baseUrl = '${AppConstants.backendUrl}api/v1/speech';
 
   Future<SarvamProcessResponse> processAudio(String filePath) async {
     final uri = Uri.parse('$_baseUrl/process');

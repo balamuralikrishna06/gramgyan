@@ -23,6 +23,7 @@ class ReportRepository {
     required String category,
     File? audioFile,
     String? manualTranscript, // If user typed instead of speaking
+    String? translatedText, // Translation from Sarvam
     String type = 'question', // Added type parameter
   }) async {
     try {
@@ -62,15 +63,16 @@ class ReportRepository {
       }
 
       // 3. Insert Report
-      final response = await _client.from('reports').insert({
+      final response = await _client.from('knowledge_posts').insert({
         'user_id': userId,
         'latitude': latitude,
         'longitude': longitude,
         'crop': crop,
         'category': category,
-        'transcript': transcript,
-        'translated_transcript': null, // Will be filled by process-report
-        'original_language': originalLanguage,
+        'original_text': transcript, // DB Column: original_text
+        'english_text': translatedText, 
+        // 'translated_transcript': translatedText, // Removed redundant legacy column if not in DB
+        'language': originalLanguage, // DB Column: language
         'audio_url': audioUrl,
         'ai_generated': false,
         'created_at': DateTime.now().toIso8601String(),
@@ -85,7 +87,8 @@ class ReportRepository {
         'process-report',
         body: {
           'report_id': reportId,
-          'transcript': transcript,
+          'original_text': transcript, // Matches DB column naming
+          'translated_text': translatedText,
           'type': type
         }
       ).ignore(); // Don't wait for it
