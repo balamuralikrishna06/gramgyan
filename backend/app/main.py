@@ -28,6 +28,8 @@ app.add_middleware(
 )
 
 app.include_router(speech.router, prefix="/api/v1/speech", tags=["speech"])
+from app.routes import auth
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 
 @app.get("/")
 async def root():
