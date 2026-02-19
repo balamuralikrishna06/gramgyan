@@ -18,8 +18,8 @@ class AuthRepository {
   
   // For Android Emulator, use 'http://10.0.2.2:8000'
   // For Physical Device, use your computer's local IP, e.g., 'http://192.168.1.5:8000'
-  // Ensure your computer and phone are on the same Wi-Fi network.
-  static const String _baseUrl = 'http://10.0.2.2:8000'; 
+  // For Production/Render, use your deployed URL.
+  static const String _baseUrl = 'https://gramgyan-1.onrender.com'; 
 
 
   // ── Getters ──

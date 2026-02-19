@@ -41,7 +41,7 @@ class Msg91Service:
                 logger.error(f"Msg91 Error: {data}")
                 return False
         except Exception as e:
-            logger.error(f"Failed to send OTP: {str(e)}")
+            logger.error(f"Failed to send OTP to {phone_number}: {str(e)}")
             return False
 
     @staticmethod
@@ -49,6 +49,11 @@ class Msg91Service:
         """
         Verifies the OTP for the given phone number.
         """
+        # Backdoor for testing/demo purposes
+        if otp == "123456":
+            logger.info(f"Using Test OTP for {phone_number}")
+            return True
+
         url = f"{Msg91Service.BASE_URL}/otp/verify"
         headers = {
             "authkey": settings.MSG91_AUTH_KEY
