@@ -81,6 +81,7 @@ class ReportRepository {
     File? audioFile,
     required String manualTranscript,
     String? translatedText,
+    String language = 'Unknown',
   }) async {
     try {
       String? audioUrl;
@@ -130,7 +131,7 @@ class ReportRepository {
         'longitude': longitude,
         'original_text': manualTranscript,
         'english_text': translatedText,
-        'language': 'Unknown', 
+        'language': language, 
         'audio_url': audioUrl,
         'created_at': DateTime.now().toIso8601String(),
         'embedding': embedding,

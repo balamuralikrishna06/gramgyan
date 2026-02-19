@@ -13,9 +13,33 @@ class GeminiService {
 
   GeminiService() {
     _model = GenerativeModel(
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-flash', 
       apiKey: AppConstants.geminiApiKey,
     );
+  }
+
+  /// Helper to execute Gemini requests with retry logic for Rate Limits (429)
+  Future<GenerateContentResponse> _generateWithRetry(List<Content> prompt, {int maxRetries = 5}) async {
+    int attempt = 0;
+    while (attempt < maxRetries) {
+      try {
+        return await _model.generateContent(prompt);
+      } catch (e) {
+        attempt++;
+        final errorStr = e.toString().toLowerCase();
+        if (errorStr.contains('429') || 
+            errorStr.contains('resource has been exhausted') ||
+            errorStr.contains('quota') ||
+            errorStr.contains('limit')) {
+          debugPrint('Gemini Rate Limit/Quota hit. Retrying in ${2 * attempt} seconds...');
+          await Future.delayed(Duration(seconds: 2 * attempt));
+        } else {
+          // Re-throw if it's likely not a transient rate limit
+          rethrow;
+        }
+      }
+    }
+    throw Exception('Gemini Rate Limit Exceeded after $maxRetries retries.');
   }
 
   /// Transcribes audio file to text using the 'transcribe-audio' Edge Function (Whisper)
@@ -119,7 +143,7 @@ class GeminiService {
   Future<String> translateText(String text, String targetLang) async {
     try {
       final prompt = 'Translate the following text to $targetLang:\n\n$text';
-      final response = await _model.generateContent([Content.text(prompt)]);
+      final response = await _generateWithRetry([Content.text(prompt)]);
       return response.text?.trim() ?? text;
     } catch (e) {
       // Return original text on failure to avoid blocking
@@ -131,7 +155,7 @@ class GeminiService {
   Future<String> generateAnswer(String query) async {
     try {
       final prompt = 'Provide a clear, simple agricultural solution for this farmer question: "$query". Keep the answer concise and easy to understand for a farmer.';
-      final response = await _model.generateContent([Content.text(prompt)]);
+      final response = await _generateWithRetry([Content.text(prompt)]);
       return response.text?.trim() ?? 'I could not generate an answer at this time.';
     } catch (e) {
       debugPrint('Gemini Multi-turn Answer Error: $e');
@@ -168,7 +192,7 @@ FLAG AS UNSAFE ("safe": false) IF:
 If in doubt, FLAG AS UNSAFE.
 ''';
 
-      final response = await _model.generateContent([Content.text(prompt)]);
+      final response = await _generateWithRetry([Content.text(prompt)]);
       final responseText = response.text?.trim() ?? '';
       debugPrint('Gemini Safety Check Raw Response: $responseText');
       

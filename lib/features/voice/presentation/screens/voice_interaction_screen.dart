@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,6 +13,8 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../map/presentation/providers/map_providers.dart';
 import '../../../../core/providers/service_providers.dart';
 import '../../../discussion/providers/discussion_providers.dart';
+import '../../../../core/providers/language_provider.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../widgets/voice_recorder_widget.dart';
 
 enum VoiceMode { ask, share }
@@ -38,6 +41,14 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   String? _tamilAnswer;
   int _matchSimilarity = 0;
   bool _isAiAnswer = false;
+  String? _matchedAudioUrl;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
 
   void _handleVoiceResult(String transcript, String translation, String? audioPath) {
     if (transcript.trim().isEmpty) {
@@ -153,9 +164,23 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
             _isAiAnswer = false;
           });
 
-          // Speak the Tamil answer via flutter_tts
-          final tts = ref.read(textToSpeechServiceProvider);
-          await tts.speak(tamilAnswer, language: 'ta-IN');
+          // Speak the Tamil answer via flutter_tts or Play Original Audio
+          final audioUrl = matchData['audio_url'] as String?;
+          if (audioUrl != null && audioUrl.isNotEmpty) {
+            debugPrint('Playing original audio for solution: $audioUrl');
+            await _audioPlayer.stop(); // Stop any previous
+            await _audioPlayer.play(UrlSource(audioUrl));
+            setState(() {
+              _matchedAudioUrl = audioUrl;
+            });
+          } else {
+             debugPrint('No original audio, using TTS.');
+             final tts = ref.read(textToSpeechServiceProvider);
+             await tts.speak(tamilAnswer, language: 'ta-IN');
+             setState(() {
+               _matchedAudioUrl = null;
+             });
+          }
 
         } else {
           // ❌ NO MATCH → Post to Community + Get AI Answer
@@ -213,6 +238,13 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
       } else {
         // --- SHARE KNOWLEDGE FLOW ---
+        // Get current language name (e.g., 'Tamil', 'English')
+        final languageCode = ref.read(languageProvider) ?? 'en';
+        final languageName = AppConstants.supportedLanguages.firstWhere(
+          (l) => l['code'] == languageCode,
+          orElse: () => {'english': 'Unknown'},
+        )['english'] ?? 'Unknown';
+
         // Use createKnowledgePost for Sharing (Handles Embeddings)
         await repo.createKnowledgePost(
           userId: userId,
@@ -221,6 +253,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           audioFile: File(_audioPath!),
           manualTranscript: _transcript!,
           translatedText: _translation, 
+          language: languageName,
         );
 
         if (!mounted) return;
@@ -252,8 +285,9 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   }
 
   void _reset() {
-    // Stop TTS if playing
+    // Stop TTS or Audio if playing
     try { ref.read(textToSpeechServiceProvider).stop(); } catch (_) {}
+    _audioPlayer.stop();
     setState(() {
       _transcript = null;
       _translation = null;
@@ -505,12 +539,17 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        final tts = ref.read(textToSpeechServiceProvider);
-                                        tts.speak(
-                                          _tamilAnswer ?? _matchedAnswer!,
-                                          language: 'ta-IN',
-                                        );
+                                      onPressed: () async {
+                                        if (_matchedAudioUrl != null) {
+                                           await _audioPlayer.stop();
+                                           await _audioPlayer.play(UrlSource(_matchedAudioUrl!));
+                                        } else {
+                                          final tts = ref.read(textToSpeechServiceProvider);
+                                          tts.speak(
+                                            _tamilAnswer ?? _matchedAnswer!,
+                                            language: 'ta-IN',
+                                          );
+                                        }
                                       },
                                       icon: const Icon(Icons.volume_up_rounded),
                                       label: Text(_isAiAnswer ? 'Listen AI Answer 🔉' : 'Listen Community Answer 🔊'),
