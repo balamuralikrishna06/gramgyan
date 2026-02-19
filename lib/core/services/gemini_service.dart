@@ -143,47 +143,52 @@ class GeminiService {
   Future<({bool isSafe, String? reason})> checkSafety(String text) async {
     try {
       final prompt = '''
-You are an agricultural expert and safety moderator. 
-Evaluate the following agricultural advice/text for safety and scientific validity.
-Text: "$text"
+You are a STRICT Agricultural Knowledge Verifier.
+Your job is to filter out ANY content that is not a valid, helpful, and accurate agricultural tip.
 
-Reply with ONLY a JSON object in this format:
+Text to Verify: "$text"
+
+Reply with ONLY a JSON object:
 {
   "safe": true/false,
-  "reason": "Short explanation if unsafe, otherwise null"
+  "reason": "EXACT reason why it failed (e.g., 'Not related to farming', 'Scientifically incorrect', 'Vague/Spam')"
 }
-Criteria:
-- Unsafe if it recommends harmful chemicals banned in India.
-- Unsafe if it suggests dangerous dosage of pesticides/fertilizers.
-- Unsafe if it is clearly spam, hate speech, or irrelevant to farming.
-- Safe otherwise.
+
+STRICT CRITERIA for "safe": true:
+1. MUST be about Agriculture, Farming, Livestock, or Crops.
+2. MUST be scientifically ACCURATE and helpful.
+3. MUST be a clear tip or knowledge (not just "Hello" or a question).
+
+FLAG AS UNSAFE ("safe": false) IF:
+- Irrelevant to farming (e.g., Politics, Sports, General Greeting, Human Health).
+- Scientifically incorrect (e.g., "Pour battery acid on crops").
+- Vague or Spam (e.g., "Good morning", "Test", "Call me").
+- Harmful / Dangerous.
+
+If in doubt, FLAG AS UNSAFE.
 ''';
 
       final response = await _model.generateContent([Content.text(prompt)]);
       final responseText = response.text?.trim() ?? '';
+      debugPrint('Gemini Safety Check Raw Response: $responseText');
       
       // Basic cleaning to handle potential markdown code blocks
       final jsonString = responseText.replaceAll('```json', '').replaceAll('```', '').trim();
       
-      // We'll manually parse simple JSON to avoid heavy dependencies if needed, 
-      // but for now let's assume valid JSON or basic string checking.
-      // Since we can't easily import dart:convert inside this replace block if not already there,
-      // and to be robust, we'll do a robust check.
-      
       if (jsonString.toLowerCase().contains('"safe": true')) {
-        return (isSafe: true, reason: null);
+        debugPrint('Gemini: Content marked as SAFE');
+        return (isSafe: true, reason: 'Verified Safe by AI');
       } else if (jsonString.toLowerCase().contains('"safe": false')) {
         // Extract reason roughly
         final reasonMatch = RegExp(r'"reason":\s*"(.*?)"').firstMatch(jsonString);
-        final reason = reasonMatch?.group(1) ?? 'Flagged as unsafe by AI';
+        final reason = reasonMatch?.group(1) ?? 'Flagged as unsafe/irrelevant by AI';
+        debugPrint('Gemini: Content marked as UNSAFE. Reason: $reason');
         return (isSafe: false, reason: reason);
       }
       
-      // Fallback: Default to safe (let humans review) if AI is ambiguous, 
-      // OR default to unsafe if we want strictness.
-      // Given "Pending" layer exists, we can default to safe but flag it?
-      // Let's default to false to be careful if AI fails to output JSON.
-      return (isSafe: true, reason: 'AI parsing failed, requires human review');
+      // Fallback: If AI fails to parse, FLAG IT as unsafe just to be sure.
+      debugPrint('Gemini: Parsing failed, defaulting to UNSAFE for manual review.');
+      return (isSafe: false, reason: 'AI parsing failed, requires human review');
       
     } catch (e) {
       debugPrint('Safety Check Failed: $e');

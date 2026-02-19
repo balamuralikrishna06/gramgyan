@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../domain/models/report.dart';
 import '../../../../core/services/gemini_service.dart';
+import '../../../../core/constants/app_constants.dart';
 
 class ReportRepository {
   final SupabaseClient _client;
@@ -113,6 +114,7 @@ class ReportRepository {
       String? aiReason;
       try {
         if (textToProcess.isNotEmpty) {
+           debugPrint('Starting AI Safety Check. Key prefix: ${AppConstants.geminiApiKey.substring(0, 5)}...');
           final safetyResult = await _geminiService.checkSafety(textToProcess);
           aiFlagged = !safetyResult.isSafe;
           aiReason = safetyResult.reason;
