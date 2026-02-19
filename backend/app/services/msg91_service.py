@@ -24,12 +24,16 @@ class Msg91Service:
         # Checking Msg91 docs, usually query params or body.
         # V5 API uses query params for GET or body for POST with template.
         
-        # Using POST with template_id
+        # Using POST. If template_id is empty, MSG91 uses default.
         payload = {
-            "template_id": settings.MSG91_TEMPLATE_ID,
             "mobile": phone_number,
             "authkey": settings.MSG91_AUTH_KEY
         }
+        
+        # Only add template_id if it's set and not empty
+        if settings.MSG91_TEMPLATE_ID and settings.MSG91_TEMPLATE_ID.strip():
+             payload["template_id"] = settings.MSG91_TEMPLATE_ID
+
         
         try:
             async with httpx.AsyncClient() as client:
