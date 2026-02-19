@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -43,6 +45,10 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   bool _isAiAnswer = false;
   String? _matchedAudioUrl;
   final AudioPlayer _audioPlayer = AudioPlayer();
+  
+  // Image State
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void dispose() {
@@ -65,6 +71,25 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       _audioPath = audioPath;
       _isProcessing = false;
     });
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source, 
+        imageQuality: 50, // Optimize for API
+      );
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      debugPrint('Image picker error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to pick image: $e')),
+      );
+    }
   }
 
   Future<void> _submit() async {
@@ -126,7 +151,110 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
       if (_selectedMode == VoiceMode.ask) {
         // --- ASK FLOW ---
-        // 1. Generate embedding for the question
+        
+        // 🆕 1. Check for Image (Multimodal Diagnosis)
+        if (_selectedImage != null) {
+          setState(() => _loadingMessage = 'Analyzing crop health...');
+          final geminiService = ref.read(geminiServiceProvider);
+          
+          // Use translation or transcript or default query
+          final queryText = _translation ?? _transcript ?? 'What is wrong with this crop?';
+          
+          final analysisJson = await geminiService.analyzeCropDisease(_selectedImage!, queryText);
+          
+          String englishSummary = analysisJson;
+          
+          // Try to parse JSON to get the friendly summary
+          try {
+            // Clean markdown code blocks if present
+            final cleanJson = analysisJson.replaceAll('```json', '').replaceAll('```', '').trim();
+            final Map<String, dynamic> data = json.decode(cleanJson);
+            
+            if (data.containsKey('summary_for_farmer')) {
+              englishSummary = data['summary_for_farmer'];
+            }
+          } catch (e) {
+            debugPrint('JSON Parse Error: $e');
+            // Fallback to raw text if parsing fails
+          }
+
+          
+          // 2026-02-19 FIX: Ensure content is truly English before translating
+          bool isHindi = RegExp(r'[\u0900-\u097F]').hasMatch(englishSummary);
+          if (isHindi) {
+            debugPrint('⚠️ Warning: AI returned Hindi/Devanagari text in English field.');
+            // Strategy: Translate this "Hindi" English summary to Actual English first, or directly to Tamil
+            // Let's try to translate it to Tamil directly, but setting source to 'hi-IN'
+             final sarvam = ref.read(sarvamApiServiceProvider);
+             
+             // 1. Translate Hindi -> Tamil
+             final tamilSummary = await sarvam.translateText(
+                englishSummary,
+                sourceLanguage: 'hi-IN', // Correct the source
+                targetLanguage: 'ta-IN',
+              );
+
+             // 2. Translate Hindi -> English (for display)
+             final newEnglish = await sarvam.translateText(
+                englishSummary,
+                sourceLanguage: 'hi-IN',
+                targetLanguage: 'en-IN',
+              );
+              
+             setState(() {
+                _isProcessing = false;
+                _loadingMessage = null;
+                _matchedAnswer = newEnglish; // Fixed English
+                _tamilAnswer = tamilSummary;
+                _isAiAnswer = true;
+                _matchSimilarity = 0;
+                _matchedAudioUrl = null;
+              });
+
+              // Speak the result
+              final tts = ref.read(textToSpeechServiceProvider);
+              await tts.speak(tamilSummary, language: 'ta-IN');
+              
+          } else {
+             // Standard Flow (English -> Tamil)
+             setState(() => _loadingMessage = 'Translating diagnosis...');
+             final sarvam = ref.read(sarvamApiServiceProvider);
+             final tamilSummary = await sarvam.translateText(
+                englishSummary,
+                sourceLanguage: 'en-IN',
+                targetLanguage: 'ta-IN',
+              );
+              
+              setState(() {
+                _isProcessing = false;
+                _loadingMessage = null;
+                _matchedAnswer = englishSummary;
+                _tamilAnswer = tamilSummary;
+                _isAiAnswer = true;
+                _matchSimilarity = 0;
+                _matchedAudioUrl = null;
+              });
+
+              // Speak the result
+              final tts = ref.read(textToSpeechServiceProvider);
+              await tts.speak(tamilSummary, language: 'ta-IN');
+          }
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Crop Diagnosed! 🌿'),
+              backgroundColor: AppColors.primary,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+          
+          return; // Exit Ask Flow
+        }
+
+        // 📝 2. Text-Only Flow (Existing)
+        // Generate embedding for the question
         setState(() => _loadingMessage = 'Searching knowledge base...');
         final geminiService = ref.read(geminiServiceProvider);
         final queryText = _translation ?? _transcript!;
@@ -134,7 +262,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
         if (!mounted) return;
 
-        // 2. Route based on similarity score
+        // Route based on similarity score
         final hasGoodMatch = matches.isNotEmpty && 
             (matches.first['similarity'] as num? ?? 0) >= 0.75;
 
@@ -186,12 +314,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           // ❌ NO MATCH → Post to Community + Get AI Answer
           setState(() => _loadingMessage = 'Posting to community & consulting AI...');
           
-          final farmerName = (authState is AuthAuthenticated)
-              ? (authState.displayName ?? 'Farmer')
-              : 'Farmer';
-
-          // 3. Post to community discussion in background
-          // 3. Post to community discussion in background
+          // Post to community discussion in background
           repo.createQuestion(
             userId: userId,
             originalText: _transcript!,
@@ -201,10 +324,10 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
             audioFile: File(_audioPath!),
           ).ignore();
 
-          // 4. Generate AI Answer using Gemini
+          // Generate AI Answer using Gemini
           final aiAnswer = await geminiService.generateAnswer(queryText);
 
-          // 5. Translate AI Answer to Tamil
+          // Translate AI Answer to Tamil
           final sarvam = ref.read(sarvamApiServiceProvider);
           final tamilAiAnswer = await sarvam.translateText(
             aiAnswer,
@@ -297,6 +420,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       _matchSimilarity = 0;
       _isAiAnswer = false;
       _isProcessing = false;
+      _selectedImage = null; // Reset image
     });
   }
 
@@ -356,7 +480,45 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                 
                 const Spacer(flex: 2),
 
-                // ── Mic Button ──
+                // ── Image Preview (Initial State) ──
+                if (_selectedImage != null)
+                  Stack(
+                    alignment: Alignment.topRight,
+                    children: [
+                      Container(
+                        height: 120, width: 120,
+                        margin: const EdgeInsets.only(bottom: 24),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          image: DecorationImage(
+                            image: FileImage(_selectedImage!),
+                            fit: BoxFit.cover,
+                          ),
+                          border: Border.all(color: AppColors.primary, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            )
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedImage = null),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                // ── Mic & Camera Controls ──
                 if (_isProcessing)
                   Column(
                     children: [
@@ -366,9 +528,58 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                     ],
                   )
                 else
-                  VoiceRecorderWidget(
-                    onResult: _handleVoiceResult,
-                    initialLocale: 'ta_IN',
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Gallery
+                       Container(
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.surfaceDark : Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                            )
+                          ],
+                        ),
+                        child: IconButton(
+                          onPressed: () => _pickImage(ImageSource.gallery),
+                          icon: const Icon(Icons.photo_library_rounded),
+                          color: AppColors.primary,
+                          tooltip: 'Gallery',
+                        ),
+                      ),
+                      const SizedBox(width: 24),
+                      
+                      // Mic (Center)
+                      VoiceRecorderWidget(
+                        onResult: _handleVoiceResult,
+                        initialLocale: 'ta_IN',
+                      ),
+                      
+                      const SizedBox(width: 24),
+                      
+                      // Camera
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.surfaceDark : Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                            )
+                          ],
+                        ),
+                        child: IconButton(
+                          onPressed: () => _pickImage(ImageSource.camera),
+                          icon: const Icon(Icons.camera_alt_rounded),
+                          color: AppColors.primary,
+                          tooltip: 'Camera',
+                        ),
+                      ),
+                    ],
                   ),
 
                 const Spacer(flex: 3),
@@ -395,6 +606,20 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (_selectedImage != null) ...[
+                            Container(
+                              height: 150,
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                image: DecorationImage(
+                                  image: FileImage(_selectedImage!),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                          ],
                           Row(
                             children: [
                               Icon(Icons.record_voice_over_rounded, 

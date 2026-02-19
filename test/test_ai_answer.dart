@@ -5,23 +5,31 @@ import 'dart:async';
 // Helper to read API key from .env without flutter dependencies
 String getApiKey() {
   final envFile = File('.env');
-  if (!envFile.existsSync()) {
-    // Try looking one level up if run from test dir
-    final parentEnv = File('../.env');
-    if (parentEnv.existsSync()) return _parseEnv(parentEnv);
-    throw Exception('.env file not found');
-  }
-  return _parseEnv(envFile);
+  if (envFile.existsSync()) return _parseEnv(envFile);
+  
+  // Try looking one level up if run from test dir
+  final parentEnv = File('../.env');
+  if (parentEnv.existsSync()) return _parseEnv(parentEnv);
+  
+  throw Exception('.env file not found');
 }
 
 String _parseEnv(File file) {
   final lines = file.readAsLinesSync();
   for (var line in lines) {
+    // Check for multi-key first
+    if (line.trim().startsWith('GEMINI_API_KEYS=')) {
+      final keys = line.split('=')[1].trim();
+      if (keys.isNotEmpty) {
+        return keys.split(',').first.trim();
+      }
+    }
+    // Fallback to single key
     if (line.trim().startsWith('GEMINI_API_KEY=')) {
       return line.split('=')[1].trim();
     }
   }
-  throw Exception('GEMINI_API_KEY not found in .env');
+  throw Exception('GEMINI_API_KEYS not found in .env');
 }
 
 void main() async {

@@ -81,10 +81,25 @@ class AppShell extends StatelessWidget {
           ),
         ),
         floatingActionButton: index == 0
-            ? FloatingActionButton(
-                heroTag: 'main_fab',
-                onPressed: () => context.push('/voice-interaction'),
-                child: const Icon(Icons.mic_rounded, size: 30),
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FloatingActionButton(
+                    heroTag: 'chat_fab',
+                    mini: true,
+                    backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+                    foregroundColor: AppColors.primary,
+                    elevation: 4,
+                    onPressed: () => context.push('/chat'),
+                    child: const Icon(Icons.chat_bubble_outline_rounded),
+                  ),
+                  const SizedBox(height: 12),
+                  FloatingActionButton(
+                    heroTag: 'main_fab',
+                    onPressed: () => context.push('/voice-interaction'),
+                    child: const Icon(Icons.mic_rounded, size: 30),
+                  ),
+                ],
               )
             : null,
       ),

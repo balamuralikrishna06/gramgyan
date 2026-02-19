@@ -7,19 +7,41 @@ import '../constants/app_constants.dart';
 class GeminiService {
   // Using the verified working API Key
   // Using the verified working API Key
-  // static const String apiKey = 'AIzaSyDE4R7kKKi7R0vSvVPtltNJBMLTcqGEiGI'; 
+  // Using the verified working API Key
   
-  late final GenerativeModel _model;
+  List<String> _apiKeys = [];
+  int _currentKeyIndex = 0;
+  late GenerativeModel _model;
 
   GeminiService() {
-    _model = GenerativeModel(
-      model: 'gemini-2.5-flash', 
-      apiKey: AppConstants.geminiApiKey,
-    );
+    _apiKeys = AppConstants.geminiApiKeys;
+    if (_apiKeys.isEmpty) {
+      debugPrint('Warning: No Gemini API keys found in .env');
+    }
+    _initializeModel();
   }
 
-  /// Helper to execute Gemini requests with retry logic for Rate Limits (429)
-  Future<GenerateContentResponse> _generateWithRetry(List<Content> prompt, {int maxRetries = 5}) async {
+  void _initializeModel() {
+    if (_apiKeys.isNotEmpty) {
+      final key = _apiKeys[_currentKeyIndex];
+      _model = GenerativeModel(
+        model: 'gemini-2.5-flash', 
+        apiKey: key,
+      );
+      debugPrint('GeminiService initialized with key index: $_currentKeyIndex');
+    }
+  }
+
+  void _rotateKey() {
+    if (_apiKeys.length <= 1) return; // No other keys to rotate to
+    
+    _currentKeyIndex = (_currentKeyIndex + 1) % _apiKeys.length;
+    debugPrint('🔄 Rotating Gemini API Key to index: $_currentKeyIndex');
+    _initializeModel();
+  }
+
+  /// Helper to execute Gemini requests with retry logic and Key Rotation
+  Future<GenerateContentResponse> _generateWithRetry(List<Content> prompt, {int maxRetries = 3}) async {
     int attempt = 0;
     while (attempt < maxRetries) {
       try {
@@ -27,19 +49,25 @@ class GeminiService {
       } catch (e) {
         attempt++;
         final errorStr = e.toString().toLowerCase();
+        
+        // Check for Quota/Rate Limit errors
         if (errorStr.contains('429') || 
             errorStr.contains('resource has been exhausted') ||
             errorStr.contains('quota') ||
             errorStr.contains('limit')) {
-          debugPrint('Gemini Rate Limit/Quota hit. Retrying in ${2 * attempt} seconds...');
-          await Future.delayed(Duration(seconds: 2 * attempt));
+          
+          debugPrint('⚠️ Gemini Rate Limit hit (Attempt $attempt). Rotating key...');
+          _rotateKey();
+          
+          // Add a small delay even after rotation to be safe
+          await Future.delayed(const Duration(milliseconds: 500));
         } else {
           // Re-throw if it's likely not a transient rate limit
           rethrow;
         }
       }
     }
-    throw Exception('Gemini Rate Limit Exceeded after $maxRetries retries.');
+    throw Exception('Gemini Rate Limit Exceeded after $maxRetries retries (Keys rotated).');
   }
 
   /// Transcribes audio file to text using the 'transcribe-audio' Edge Function (Whisper)
@@ -75,68 +103,73 @@ class GeminiService {
     }
   }
 
+  /// internal helper for embeddings with rotation
+  Future<List<double>?> _generateEmbeddingWithRotation(String text, TaskType taskType) async {
+    int maxRetries = 3; 
+    int attempt = 0;
+    
+    while (attempt < maxRetries) {
+      try {
+        final currentKey = _apiKeys.isNotEmpty ? _apiKeys[_currentKeyIndex] : '';
+        if (currentKey.isEmpty) return null;
+
+        // Try Primary Model
+        try {
+          final embeddingModel = GenerativeModel(
+            model: 'models/gemini-embedding-001',
+            apiKey: currentKey, 
+          );
+          final content = Content.text(text);
+          final result = await embeddingModel.embedContent(content, taskType: taskType);
+          return result.embedding.values;
+        } catch (e) {
+             final errorStr = e.toString().toLowerCase();
+             if (errorStr.contains('429') || errorStr.contains('quota') || errorStr.contains('limit')) {
+               throw e; // Rethrow to outer loop for rotation
+             }
+             // Otherwise try fallback model
+             debugPrint('Primary embedding failed ($e). Trying fallback...');
+             final fallbackModel = GenerativeModel(
+                model: 'models/embedding-001',
+                apiKey: currentKey,
+             );
+             final content = Content.text(text);
+             final result = await fallbackModel.embedContent(content, taskType: taskType);
+             return result.embedding.values;
+        }
+      } catch (e) {
+        attempt++;
+        final errorStr = e.toString().toLowerCase();
+        
+        if (errorStr.contains('429') || 
+            errorStr.contains('resource has been exhausted') ||
+            errorStr.contains('quota') ||
+            errorStr.contains('limit')) {
+          
+          debugPrint('⚠️ Gemini Embedding Rate Limit hit. Rotating key...');
+          _rotateKey();
+          await Future.delayed(const Duration(milliseconds: 500));
+        } else {
+          debugPrint('Embedding Error: $e');
+          return null; // Non-retriable error
+        }
+      }
+    }
+    return null;
+  }
+
   /// Generates a document embedding from English text.
   /// Used for storing knowledge posts and questions.
   Future<List<double>?> generateEmbedding(String text) async {
     if (text.isEmpty) return null;
-    
-    try {
-      debugPrint('Gemini: Generating embedding for: "${text.substring(0, text.length > 20 ? 20 : text.length)}..."');
-      final embeddingModel = GenerativeModel(
-        model: 'models/gemini-embedding-001',
-        apiKey: AppConstants.geminiApiKey, 
-      );
-      final content = Content.text(text);
-      final result = await embeddingModel.embedContent(content, taskType: TaskType.retrievalDocument);
-      debugPrint('Gemini: Embedding generated successfully. Length: ${result.embedding.values.length}');
-      return result.embedding.values;
-    } catch (e) {
-      debugPrint('Gemini Embedding Error (gemini-embedding-001): $e');
-      // Fallback to older model
-      try {
-        debugPrint('Gemini: Retrying with models/embedding-001...');
-        final fallbackModel = GenerativeModel(
-          model: 'models/embedding-001',
-          apiKey: AppConstants.geminiApiKey,
-        );
-        final content = Content.text(text);
-        final result = await fallbackModel.embedContent(content, taskType: TaskType.retrievalDocument);
-        return result.embedding.values;
-      } catch (e2) {
-        debugPrint('Gemini Fallback Embedding Error: $e2');
-        return null;
-      }
-    }
+    return _generateEmbeddingWithRotation(text, TaskType.retrievalDocument);
   }
 
   /// Generates a query embedding optimized for searching.
   /// Uses TaskType.retrievalQuery for accurate similarity matching.
   Future<List<double>?> generateQueryEmbedding(String text) async {
     if (text.isEmpty) return null;
-    
-    try {
-      final embeddingModel = GenerativeModel(
-        model: 'models/gemini-embedding-001',
-        apiKey: AppConstants.geminiApiKey, 
-      );
-      final content = Content.text(text);
-      final result = await embeddingModel.embedContent(content, taskType: TaskType.retrievalQuery);
-      return result.embedding.values;
-    } catch (e) {
-      debugPrint('Gemini Query Embedding Error: $e');
-       // Fallback to older model
-      try {
-        final fallbackModel = GenerativeModel(
-          model: 'models/embedding-001',
-          apiKey: AppConstants.geminiApiKey,
-        );
-        final content = Content.text(text);
-        final result = await fallbackModel.embedContent(content, taskType: TaskType.retrievalQuery);
-        return result.embedding.values;
-      } catch (e2) {
-        return null;
-      }
-    }
+    return _generateEmbeddingWithRotation(text, TaskType.retrievalQuery);
   }
 
   /// Translates text to the target language
@@ -154,12 +187,12 @@ class GeminiService {
   /// Generates a clear agricultural solution for a farmer question.
   Future<String> generateAnswer(String query) async {
     try {
-      final prompt = 'Provide a clear, simple agricultural solution for this farmer question: "$query". Keep the answer concise and easy to understand for a farmer.';
+      final prompt = 'Provide a clear, simple agricultural solution for this farmer question: "$query". Keep the answer concise and easy to understand for a farmer. The answer MUST be in Tamil language.';
       final response = await _generateWithRetry([Content.text(prompt)]);
-      return response.text?.trim() ?? 'I could not generate an answer at this time.';
+      return response.text?.trim() ?? 'தற்போது என்னால் பதில் அளிக்க முடியவில்லை.';
     } catch (e) {
       debugPrint('Gemini Multi-turn Answer Error: $e');
-      return 'I could not generate an answer at this time. Please try again later.';
+      return 'தற்போது என்னால் பதில் அளிக்க முடியவில்லை. தயவுசெய்து சிறிது நேரம் கழித்து முயற்சிக்கவும்.';
     }
   }
   /// Checks if the content is safe and scientifically valid agricultural advice.
@@ -217,6 +250,52 @@ If in doubt, FLAG AS UNSAFE.
     } catch (e) {
       debugPrint('Safety Check Failed: $e');
       return (isSafe: true, reason: 'AI Check Error'); // Allow but maybe flag in UI later
+    }
+  }
+  /// Analyzes a crop image and query to diagnose diseases using Multimodal input.
+  Future<String> analyzeCropDisease(File imageFile, String query) async {
+    try {
+      final imageBytes = await imageFile.readAsBytes();
+      
+      // Construct the Master Prompt
+      final promptText = '''
+Role: You are the "Gram Gyan" Senior Multimodal Agronomist. Your mission is to support rural farmers in India by identifying crop diseases and providing actionable, safe, and culturally relevant farming advice.
+
+Step-by-Step Logic:
+1. Visual Diagnosis: Carefully inspect the image. Identify the crop and detect symptoms like necrosis, chlorosis, fungal growth, or pest infestation.
+2. Contextual Analysis: Cross-reference the visual symptoms with the user's description: "$query"
+3. Validation: If the image is not related to agriculture, or is too blurry to identify, politely ask for a clearer photo.
+4. Treatment Plan: Provide a dual solution (Organic and Chemical).
+5. Radar Impact: Determine if this issue is contagious.
+
+Response Constraints (Strict JSON):
+Return ONLY a JSON object with this structure:
+{
+"crop": "string",
+"diagnosis": "string",
+"confidence_score": 0.0 to 1.0,
+"solutions": {
+"organic": "string",
+"chemical": "string"
+},
+"prevention_tips": ["tip 1", "tip 2"],
+"radar_severity": "LOW" | "MEDIUM" | "HIGH",
+"summary_for_farmer": "A friendly, empathetic summary STRICTLY IN TAMIL language."
+}
+''';
+
+      final content = [
+        Content.multi([
+          TextPart(promptText),
+          DataPart('image/jpeg', imageBytes),
+        ])
+      ];
+
+      final response = await _generateWithRetry(content);
+      return response.text?.trim() ?? 'பிழை: பகுப்பாய்வு உருவாக்கப்படவில்லை.';
+    } catch (e) {
+      debugPrint('Gemini Crop Analysis Error: $e');
+      return 'பிழை: பயிரை பகுப்பாய்வு செய்ய முடியவில்லை. ${e.toString()}';
     }
   }
 }
