@@ -14,30 +14,31 @@ class Msg91Service:
         Sends OTP via MSG91 to the given phone number.
         Phone number should include country code (e.g., 919876543210).
         """
+        # Strip + from phone number if present
+        if phone_number.startswith('+'):
+            phone_number = phone_number[1:]
+
         url = f"{Msg91Service.BASE_URL}/otp"
+        
+        # Move authkey to headers
         headers = {
             "authkey": settings.MSG91_AUTH_KEY,
             "Content-Type": "application/json"
         }
-        # Assuming template_id is used. If not, params might differ.
-        # Required params usually: template_id, mobile, authkey, etc.
-        # Checking Msg91 docs, usually query params or body.
-        # V5 API uses query params for GET or body for POST with template.
-        
-        # Using POST. If template_id is empty, MSG91 uses default.
+
+        # Payload for JSON body
         payload = {
-            "mobile": phone_number,
-            "authkey": settings.MSG91_AUTH_KEY
+            "mobile": phone_number
         }
         
         # Only add template_id if it's set and not empty
         if settings.MSG91_TEMPLATE_ID and settings.MSG91_TEMPLATE_ID.strip():
              payload["template_id"] = settings.MSG91_TEMPLATE_ID
-
         
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, params=payload)
+                # Use json=payload to send as JSON body
+                response = await client.post(url, json=payload, headers=headers)
                 response.raise_for_status()
                 data = response.json()
                 if data.get("type") == "success":
