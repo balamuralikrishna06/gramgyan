@@ -71,6 +71,8 @@ class ReportRepository {
 
   /// Creates a new post in 'knowledge_posts' table (for Sharing Knowledge).
   /// Generates embeddings using Gemini.
+  /// Creates a new submission in 'knowledge_submissions' table (Pending Verification).
+  /// Generates embeddings and checks AI safety.
   Future<void> createKnowledgePost({
     required String userId,
     required double latitude,
@@ -93,33 +95,115 @@ class ReportRepository {
         audioUrl = _client.storage.from('knowledge-audio').getPublicUrl(fileName);
       }
 
+      final String effectiveTranslatedText = translatedText ?? '';
+      final textToProcess = effectiveTranslatedText.isNotEmpty ? effectiveTranslatedText : manualTranscript;
+
       // 2. Generate Embedding (Gemini)
       List<double>? embedding;
       try {
-        final String effectiveTranslatedText = translatedText ?? '';
-        final textToEmbed = effectiveTranslatedText.isNotEmpty ? effectiveTranslatedText : manualTranscript;
-        if (textToEmbed.isNotEmpty) {
-           embedding = await _geminiService.generateEmbedding(textToEmbed);
+        if (textToProcess.isNotEmpty) {
+           embedding = await _geminiService.generateEmbedding(textToProcess);
         }
       } catch (e) {
         debugPrint('Embedding generation failed: $e');
       }
 
-      // 3. Insert into 'knowledge_posts'
-      await _client.from('knowledge_posts').insert({
+      // 3. AI Safety Check
+      bool aiFlagged = false;
+      String? aiReason;
+      try {
+        if (textToProcess.isNotEmpty) {
+          final safetyResult = await _geminiService.checkSafety(textToProcess);
+          aiFlagged = !safetyResult.isSafe;
+          aiReason = safetyResult.reason;
+        }
+      } catch (e) {
+        debugPrint('Safety check failed: $e');
+      }
+
+      // 4. Insert into 'knowledge_submissions' (Pending Layer)
+      await _client.from('knowledge_submissions').insert({
         'user_id': userId,
         'latitude': latitude,
         'longitude': longitude,
         'original_text': manualTranscript,
         'english_text': translatedText,
-        'language': 'Unknown', // Could be detected language
+        'language': 'Unknown', 
         'audio_url': audioUrl,
         'created_at': DateTime.now().toIso8601String(),
         'embedding': embedding,
+        'ai_flagged': aiFlagged,
+        'ai_reason': aiReason,
+        'moderation_status': 'pending', 
       });
 
     } catch (e) {
-      throw Exception('Failed to create knowledge post: $e');
+      throw Exception('Failed to create knowledge submission: $e');
+    }
+  }
+
+  // ── Admin / Expert Methods ──
+
+  /// Fetches all pending submissions for moderation.
+  Future<List<Map<String, dynamic>>> getPendingSubmissions() async {
+    try {
+      final response = await _client
+          .from('knowledge_submissions')
+          .select()
+          .eq('moderation_status', 'pending')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching pending submissions: $e');
+      return [];
+    }
+  }
+
+  /// Approves a submission.
+  /// 1. Updates submission status to 'approved'.
+  /// 2. Inserts into 'knowledge_posts' (Verified Layer).
+  Future<void> approveSubmission(Map<String, dynamic> submission) async {
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // 1. Insert into Verified Layer
+      await _client.from('knowledge_posts').insert({
+        'submission_id': submission['id'],
+        'user_id': submission['user_id'],
+        'original_text': submission['original_text'],
+        'english_text': submission['english_text'],
+        'language': submission['language'],
+        'audio_url': submission['audio_url'],
+        'latitude': submission['latitude'],
+        'longitude': submission['longitude'],
+        'embedding': submission['embedding'],
+        'is_verified': true,
+        'verified_by': userId,
+        'verified_at': DateTime.now().toIso8601String(),
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // 2. Update Submission Status
+      await _client
+          .from('knowledge_submissions')
+          .update({'moderation_status': 'approved'})
+          .eq('id', submission['id']);
+
+    } catch (e) {
+      throw Exception('Failed to approve submission: $e');
+    }
+  }
+
+  /// Rejects a submission.
+  Future<void> rejectSubmission(String submissionId) async {
+    try {
+      await _client
+          .from('knowledge_submissions')
+          .update({'moderation_status': 'rejected'})
+          .eq('id', submissionId);
+    } catch (e) {
+      throw Exception('Failed to reject submission: $e');
     }
   }
 

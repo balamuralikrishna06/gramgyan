@@ -11,6 +11,8 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../domain/models/farmer_profile.dart';
 import '../../presentation/providers/profile_providers.dart';
 
+import '../../../auth/domain/models/auth_state.dart';
+
 /// Profile Screen — avatar card, stats row with 4 metrics, badges section,
 /// and settings with Dark Mode toggle, language, offline, about.
 class ProfileScreen extends ConsumerWidget {
@@ -19,17 +21,18 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(farmerProfileProvider);
+    final authState = ref.watch(authStateProvider);
     final isDark = ref.watch(darkModeProvider);
     final brightness = Theme.of(context).brightness == Brightness.dark;
 
     return profileAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error loading profile: $e')),
-      data: (profile) => _buildProfileContent(context, ref, profile, isDark, brightness),
+      data: (profile) => _buildProfileContent(context, ref, profile, isDark, brightness, authState),
     );
   }
 
-  Widget _buildProfileContent(BuildContext context, WidgetRef ref, FarmerProfile profile, bool isDark, bool brightness) {
+  Widget _buildProfileContent(BuildContext context, WidgetRef ref, FarmerProfile profile, bool isDark, bool brightness, AuthState authState) {
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -197,7 +200,24 @@ class ProfileScreen extends ConsumerWidget {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
+
+            // Admin Dashboard Button
+            if (authState is AuthAuthenticated &&
+                (authState.role == 'admin' || authState.role == 'expert'))
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ElevatedButton.icon(
+                  onPressed: () => context.push('/admin'),
+                  icon: const Icon(Icons.admin_panel_settings_rounded),
+                  label: const Text('Admin Dashboard'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    fixedSize: const Size(double.infinity, 50),
+                  ),
+                ),
+              ),
 
             // ── Settings Section ──
             Text(

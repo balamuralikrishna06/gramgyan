@@ -21,6 +21,7 @@ class AuthAuthenticated extends AuthState {
   final String? displayName;
   final String? avatarUrl;
   final String? city;
+  final String role; // 'farmer', 'expert', 'admin'
 
   const AuthAuthenticated({
     required this.userId,
@@ -28,6 +29,7 @@ class AuthAuthenticated extends AuthState {
     this.displayName,
     this.avatarUrl,
     this.city,
+    this.role = 'farmer',
   });
 }
 
