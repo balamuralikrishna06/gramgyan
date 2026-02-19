@@ -28,6 +28,7 @@ class _ProfileCompletionScreenState
 
   final _formKey = GlobalKey<FormState>();
   final _villageController = TextEditingController();
+  final _nameController = TextEditingController(); // Added
   String? _selectedState;
   String? _selectedLanguage;
   String? _selectedCrop;
@@ -54,6 +55,7 @@ class _ProfileCompletionScreenState
   void dispose() {
     _fadeController.dispose();
     _villageController.dispose();
+    _nameController.dispose(); // Added
     super.dispose();
   }
 
@@ -79,10 +81,9 @@ class _ProfileCompletionScreenState
           city: _villageController.text.trim(),
           selectedState: _selectedState!,
           language: _selectedLanguage!,
+          name: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
         );
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +99,11 @@ class _ProfileCompletionScreenState
     // Use cached values if state is loading (prevent fallback to 'Farmer')
     final displayName = _cachedDisplayName;
     final avatarUrl = _cachedAvatarUrl;
+    
+    // Pre-fill name if not edited yet and available from Google
+    if (_nameController.text.isEmpty && displayName != null && displayName != 'Farmer') {
+        _nameController.text = displayName;
+    }
 
     // Navigate on authenticated
     ref.listen<AuthState>(authStateProvider, (prev, next) {
@@ -137,6 +143,8 @@ class _ProfileCompletionScreenState
                   const SizedBox(height: 28),
 
                   // ── Profile Card (Google info) ──
+                  // We keep the Avatar but maybe remove the Text if we have input?
+                  // Actually, let's keep it as a visual header.
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -196,31 +204,32 @@ class _ProfileCompletionScreenState
                                 ),
                               ),
                               const SizedBox(height: 2),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.success
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.check_circle_rounded,
-                                        size: 12, color: AppColors.success),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Google verified',
-                                      style:
-                                          AppTextStyles.labelSmall.copyWith(
-                                        color: AppColors.success,
-                                        fontWeight: FontWeight.w600,
+                              if (displayName != null && displayName != 'Farmer')
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.check_circle_rounded,
+                                          size: 12, color: AppColors.success),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Google verified',
+                                        style:
+                                            AppTextStyles.labelSmall.copyWith(
+                                          color: AppColors.success,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         ),
@@ -228,6 +237,24 @@ class _ProfileCompletionScreenState
                     ),
                   ),
                   const SizedBox(height: 28),
+                  
+                  // ── Full Name (Added) ──
+                  _buildLabel('Full Name'),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _nameController,
+                    enabled: !isLoading,
+                    decoration: InputDecoration(
+                      hintText: 'Enter your full name',
+                      prefixIcon: const Icon(Icons.person_outline_rounded),
+                      prefixIconColor: isDark
+                          ? AppColors.primaryLight
+                          : AppColors.primary,
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 20),
 
                   // ── City ──
                   _buildLabel('City'),

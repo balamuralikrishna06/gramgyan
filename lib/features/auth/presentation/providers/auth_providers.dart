@@ -155,6 +155,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
     required String city,
     required String selectedState,
     required String language,
+    String? name,
   }) async {
     state = const app.AuthLoading('Saving profile…');
 
@@ -163,6 +164,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
         city: city,
         state: selectedState,
         language: language,
+        name: name,
       );
     } catch (_) {
       // DB save failed (table missing / RLS) — non-critical.
@@ -197,5 +199,39 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
   /// Reset error state to unauthenticated (for retry).
   void resetError() {
     state = const app.AuthUnauthenticated();
+  }
+
+  // ── OTP Logic ──
+
+  Future<void> sendOtp(String phone) async {
+    state = const app.AuthLoading('Sending OTP...');
+    try {
+      await _repo.sendOtp(phone: phone);
+      // We don't change state to "authenticated" yet, just remain in a state 
+      // where UI knows OTP is sent. 
+      // Actually, standard practice: keep state as Unauthenticated but UI shows verify screen?
+      // Or introduce a new state `AuthOtpSent`?
+      // For simplicity, let's just make the function return success/fail 
+      // and let the UI handle the navigation to Verify Screen.
+      // But we must reset loading.
+      state = const app.AuthUnauthenticated(); // Or stay loading? 
+      // Better: The UI calls this, awaits it. If no error, UI navigates.
+    } catch (e) {
+      state = app.AuthError(e.toString());
+    }
+  }
+
+  Future<void> verifyOtp(String phone, String otp) async {
+    state = const app.AuthLoading('Verifying OTP...');
+    try {
+      await _repo.verifyOtp(phone: phone, otp: otp);
+      // After success, _handleSignedIn should ideally be called if onAuthStateChange triggers.
+      // If `setSession` works, it triggering the listener.
+      // If it doesn't trigger listener automatically, we might need to manually call _handleSignedIn.
+      // Let's call it manually to be safe if the listener doesn't fire for manual token set.
+      await _handleSignedIn(); 
+    } catch (e) {
+      state = app.AuthError(e.toString());
+    }
   }
 }

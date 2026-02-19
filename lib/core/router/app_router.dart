@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/screens/splash_screen.dart';
-import '../../features/auth/presentation/screens/login_screen.dart';
-import '../../features/auth/presentation/screens/language_selection_screen.dart';
-import '../../features/auth/presentation/screens/profile_completion_screen.dart';
+import 'package:gramgyan/features/auth/presentation/screens/login_screen.dart';
+import 'package:gramgyan/features/auth/presentation/screens/otp_login_screen.dart';
+import 'package:gramgyan/features/auth/presentation/screens/otp_verify_screen.dart';
+import 'package:gramgyan/features/auth/presentation/screens/language_selection_screen.dart';
+import 'package:gramgyan/features/auth/presentation/screens/profile_completion_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/record/presentation/screens/record_screen.dart';
 import '../../features/map/presentation/screens/map_screen.dart';
@@ -51,6 +53,18 @@ final appRouter = GoRouter(
       path: '/login',
       builder: (context, state) => const LoginScreen(),
     ),
+    GoRoute(
+      path: '/otp-login',
+      builder: (context, state) => const OtpLoginScreen(),
+    ),
+    GoRoute(
+      path: '/verify-otp',
+      builder: (context, state) {
+        final phone = state.extra as String;
+        return OtpVerifyScreen(phoneNumber: phone);
+      },
+    ),
+
 
     // ── Profile Completion (first-time user) ──
     GoRoute(

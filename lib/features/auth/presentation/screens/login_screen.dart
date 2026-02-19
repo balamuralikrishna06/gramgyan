@@ -278,8 +278,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       );
     }
 
-    // ── Default: Google Sign-In Button ──
-    return _buildGoogleButton(isDark);
+    // ── Default: Sign-In Buttons ──
+    return Column(
+      children: [
+        _buildGoogleButton(isDark),
+        const SizedBox(height: 16),
+        _buildPhoneButton(isDark),
+      ],
+    );
+  }
+
+  Widget _buildPhoneButton(bool isDark) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: OutlinedButton(
+        onPressed: () => context.push('/otp-login'),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.transparent, // Transparent for outlined look
+          side: BorderSide(
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.4),
+            width: 1.5,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.phone_android_rounded, 
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            const SizedBox(width: 14),
+            Text(
+              'Login with Phone',
+              style: AppTextStyles.titleMedium.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildGoogleButton(bool isDark) {
