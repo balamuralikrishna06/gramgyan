@@ -118,6 +118,19 @@ class AppConstants {
 
   // ── API Keys & Endpoints ──
   static const String sarvamApiKey = 'sk_1m08qk56_DYpiv9SX2uLX7l7gF8SdTpD3'; // TODO: Move to .env for production
-  static String get geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? ''; // Loaded from .env
+  
+  // Supports multiple keys for rotation (comma-separated in .env)
+  static List<String> get geminiApiKeys {
+    final keysString = dotenv.env['GEMINI_API_KEYS'];
+    if (keysString != null && keysString.isNotEmpty) {
+      return keysString.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
+    // Fallback to single key
+    final singleKey = dotenv.env['GEMINI_API_KEY'];
+    return (singleKey != null && singleKey.isNotEmpty) ? [singleKey] : [];
+  }
+  
+  // Main key accessor (for backward compatibility if needed, but better to use list)
+  static String get geminiApiKey => geminiApiKeys.isNotEmpty ? geminiApiKeys.first : '';
   static const String backendUrl = 'https://gramgyan.onrender.com/';
 }
