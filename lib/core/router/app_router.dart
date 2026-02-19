@@ -9,6 +9,7 @@ import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/record/presentation/screens/record_screen.dart';
 import '../../features/map/presentation/screens/map_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/discussion/screens/ask_question_screen.dart';
 import '../../features/discussion/screens/discussion_detail_screen.dart';
 import '../../features/discussion/screens/add_solution_screen.dart';
@@ -83,6 +84,10 @@ final appRouter = GoRouter(
           pageBuilder: (context, state) => const NoTransitionPage(
             child: ProfileScreen(),
           ),
+        ),
+        GoRoute(
+          path: '/admin',
+          builder: (context, state) => const AdminDashboardScreen(),
         ),
       ],
     ),

@@ -59,11 +59,13 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
         avatarUrl: user.userMetadata?['avatar_url'] as String?,
       );
     } else {
-      // Fetch profile to get city
+      // Fetch profile to get city and role
       String? city;
+      String role = 'farmer';
       try {
         final profile = await _repo.fetchUserProfile();
         city = profile?['city'] as String?;
+        role = profile?['role'] as String? ?? 'farmer';
       } catch (_) {}
 
       state = app.AuthAuthenticated(
@@ -72,6 +74,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
         displayName: displayName,
         avatarUrl: user.userMetadata?['avatar_url'] as String?,
         city: city,
+        role: role,
       );
     }
   }
@@ -104,11 +107,13 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
           avatarUrl: user.userMetadata?['avatar_url'] as String?,
         );
       } else {
-        // Fetch profile to get city
+        // Fetch profile to get city and role
         String? city;
+        String role = 'farmer';
         try {
           final profile = await _repo.fetchUserProfile();
           city = profile?['city'] as String?;
+          role = profile?['role'] as String? ?? 'farmer';
         } catch (_) {}
 
         state = app.AuthAuthenticated(
@@ -117,6 +122,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
           displayName: displayName,
           avatarUrl: user.userMetadata?['avatar_url'] as String?,
           city: city,
+          role: role,
         );
       }
     } catch (e) {
