@@ -1,18 +1,20 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/app_constants.dart';
 
 class GeminiService {
   // Using the verified working API Key
-  static const String apiKey = 'AIzaSyDE4R7kKKi7R0vSvVPtltNJBMLTcqGEiGI'; 
+  // Using the verified working API Key
+  // static const String apiKey = 'AIzaSyDE4R7kKKi7R0vSvVPtltNJBMLTcqGEiGI'; 
   
   late final GenerativeModel _model;
 
   GeminiService() {
     _model = GenerativeModel(
-      model: 'gemini-1.5-flash',
-      apiKey: apiKey,
+      model: 'gemini-2.5-flash',
+      apiKey: AppConstants.geminiApiKey,
     );
   }
 
@@ -49,49 +51,67 @@ class GeminiService {
     }
   }
 
+  /// Generates a document embedding from English text.
+  /// Used for storing knowledge posts and questions.
   Future<List<double>?> generateEmbedding(String text) async {
-    if (text.isEmpty) {
-      print('Gemini Embedding: Text is empty');
-      return null;
-    }
+    if (text.isEmpty) return null;
     
     try {
-      print('Gemini Embedding: Generating DOCUMENT embedding for text length ${text.length}...');
+      debugPrint('Gemini: Generating embedding for: "${text.substring(0, text.length > 20 ? 20 : text.length)}..."');
       final embeddingModel = GenerativeModel(
-        model: 'gemini-embedding-001',
-        apiKey: apiKey, 
+        model: 'models/gemini-embedding-001',
+        apiKey: AppConstants.geminiApiKey, 
       );
       final content = Content.text(text);
       final result = await embeddingModel.embedContent(content, taskType: TaskType.retrievalDocument);
-      print('Gemini Embedding: Success. Vector length: ${result.embedding.values.length}');
+      debugPrint('Gemini: Embedding generated successfully. Length: ${result.embedding.values.length}');
       return result.embedding.values;
     } catch (e) {
-      print('Gemini Embedding Error: $e');
-      return null;
+      debugPrint('Gemini Embedding Error (gemini-embedding-001): $e');
+      // Fallback to older model
+      try {
+        debugPrint('Gemini: Retrying with models/embedding-001...');
+        final fallbackModel = GenerativeModel(
+          model: 'models/embedding-001',
+          apiKey: AppConstants.geminiApiKey,
+        );
+        final content = Content.text(text);
+        final result = await fallbackModel.embedContent(content, taskType: TaskType.retrievalDocument);
+        return result.embedding.values;
+      } catch (e2) {
+        debugPrint('Gemini Fallback Embedding Error: $e2');
+        return null;
+      }
     }
   }
 
-  /// Generates a query embedding optimized for searching against stored documents.
-  /// Uses TaskType.retrievalQuery for accurate cosine similarity matching.
+  /// Generates a query embedding optimized for searching.
+  /// Uses TaskType.retrievalQuery for accurate similarity matching.
   Future<List<double>?> generateQueryEmbedding(String text) async {
-    if (text.isEmpty) {
-      print('Gemini Query Embedding: Text is empty');
-      return null;
-    }
+    if (text.isEmpty) return null;
     
     try {
-      print('Gemini Query Embedding: Generating QUERY embedding for text length ${text.length}...');
       final embeddingModel = GenerativeModel(
-        model: 'gemini-embedding-001',
-        apiKey: apiKey, 
+        model: 'models/gemini-embedding-001',
+        apiKey: AppConstants.geminiApiKey, 
       );
       final content = Content.text(text);
       final result = await embeddingModel.embedContent(content, taskType: TaskType.retrievalQuery);
-      print('Gemini Query Embedding: Success. Vector length: ${result.embedding.values.length}');
       return result.embedding.values;
     } catch (e) {
-      print('Gemini Query Embedding Error: $e');
-      return null;
+      debugPrint('Gemini Query Embedding Error: $e');
+       // Fallback to older model
+      try {
+        final fallbackModel = GenerativeModel(
+          model: 'models/embedding-001',
+          apiKey: AppConstants.geminiApiKey,
+        );
+        final content = Content.text(text);
+        final result = await fallbackModel.embedContent(content, taskType: TaskType.retrievalQuery);
+        return result.embedding.values;
+      } catch (e2) {
+        return null;
+      }
     }
   }
 
@@ -107,14 +127,15 @@ class GeminiService {
     }
   }
 
-  /// Generates a simple agricultural answer for a given prompt
+  /// Generates a clear agricultural solution for a farmer question.
   Future<String> generateAnswer(String query) async {
     try {
-      final prompt = 'Provide a clear, simple agricultural solution for this farmer question:\n"$query"\nKeep the answer concise and easy to understand for a farmer.';
+      final prompt = 'Provide a clear, simple agricultural solution for this farmer question: "$query". Keep the answer concise and easy to understand for a farmer.';
       final response = await _model.generateContent([Content.text(prompt)]);
       return response.text?.trim() ?? 'I could not generate an answer at this time.';
     } catch (e) {
-      return 'I could not generate an answer at this time due to an error.';
+      debugPrint('Gemini Multi-turn Answer Error: $e');
+      return 'I could not generate an answer at this time. Please try again later.';
     }
   }
 }

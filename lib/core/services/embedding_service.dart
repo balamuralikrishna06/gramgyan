@@ -1,14 +1,14 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter/foundation.dart';
-import '../../core/services/gemini_service.dart';
+import '../constants/app_constants.dart';
 
 class EmbeddingService {
   late final GenerativeModel _embeddingModel;
 
   EmbeddingService() {
     _embeddingModel = GenerativeModel(
-      model: 'gemini-embedding-001', 
-      apiKey: GeminiService.apiKey, // Use the shared key
+      model: 'models/gemini-embedding-001', 
+      apiKey: AppConstants.geminiApiKey, // Use the shared key
     );
   }
 

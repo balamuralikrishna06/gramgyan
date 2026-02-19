@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -36,6 +37,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   String? _matchedAnswer;
   String? _tamilAnswer;
   int _matchSimilarity = 0;
+  bool _isAiAnswer = false;
 
   void _handleVoiceResult(String transcript, String translation, String? audioPath) {
     if (transcript.trim().isEmpty) {
@@ -70,9 +72,41 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       double lat = 0;
       double lng = 0;
       try {
-        final position = await ref.read(userLocationProvider.future);
-        lat = position.latitude;
-        lng = position.longitude;
+        // Force refresh location
+        ref.invalidate(userLocationProvider);
+        try {
+           final position = await ref.read(userLocationProvider.future);
+           lat = position.latitude;
+           lng = position.longitude;
+        } catch (e) {
+           debugPrint('Fresh location failed: $e');
+           try {
+             final lastKnown = await Geolocator.getLastKnownPosition();
+             if (lastKnown != null) {
+               lat = lastKnown.latitude;
+               lng = lastKnown.longitude;
+             }
+           } catch (_) {}
+        }
+        
+        // Fallback for Emulator/Testing if still 0
+        if (lat == 0 && lng == 0) {
+          debugPrint('⚠️ Location is 0,0. Using Demo Location (Dindigul) for testing.');
+          lat = 10.3673; // Dindigul Lat
+          lng = 77.9803; // Dindigul Lng
+          
+          if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('⚠️ GPS failed. Using Demo Location (Dindigul). Check Emulator Settings.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+        
+        debugPrint('Final Location used: $lat, $lng');
       } catch (e) {
         debugPrint('Location error: $e');
       }
@@ -91,7 +125,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
         // 2. Route based on similarity score
         final hasGoodMatch = matches.isNotEmpty && 
-            (matches.first['similarity'] as num? ?? 0) >= 0.78;
+            (matches.first['similarity'] as num? ?? 0) >= 0.75;
 
         if (hasGoodMatch) {
           // ✅ MATCH FOUND → Translate to Tamil + speak via Sarvam TTS
@@ -116,6 +150,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
             _matchedAnswer = answerText;
             _tamilAnswer = tamilAnswer;
             _matchSimilarity = similarity.toInt();
+            _isAiAnswer = false;
           });
 
           // Speak the Tamil answer via flutter_tts
@@ -123,58 +158,57 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           await tts.speak(tamilAnswer, language: 'ta-IN');
 
         } else {
-          // ❌ NO MATCH → Post question to discussion
-          setState(() => _loadingMessage = 'Posting to community...');
+          // ❌ NO MATCH → Post to Community + Get AI Answer
+          setState(() => _loadingMessage = 'Posting to community & consulting AI...');
           
-          final discussionRepo = ref.read(discussionRepositoryProvider);
           final farmerName = (authState is AuthAuthenticated)
               ? (authState.displayName ?? 'Farmer')
               : 'Farmer';
 
-          // Upload audio for the question
-          String? audioUrl;
-          if (_audioPath != null) {
-            try {
-              final supabase = Supabase.instance.client;
-              final fileName = '${userId}_q_${DateTime.now().millisecondsSinceEpoch}.m4a';
-              await supabase.storage.from('knowledge-audio').upload(
-                fileName,
-                File(_audioPath!),
-                fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-              );
-              audioUrl = supabase.storage.from('knowledge-audio').getPublicUrl(fileName);
-            } catch (e) {
-              debugPrint('Audio upload for question failed: $e');
-            }
-          }
-
-          // Generate embedding for the question
-          final embedding = await geminiService.generateEmbedding(queryText);
-
-          await discussionRepo.addQuestion(
-            transcript: _transcript!,
+          // 3. Post to community discussion in background
+          // 3. Post to community discussion in background
+          repo.createQuestion(
+            userId: userId,
+            originalText: _transcript!,
             englishText: _translation,
-            crop: 'General',
-            category: 'General',
-            authorId: userId,
-            farmerName: farmerName,
-            location: 'Unknown',
-            audioUrl: audioUrl,
             latitude: lat,
             longitude: lng,
-            embedding: embedding,
+            audioFile: File(_audioPath!),
+          ).ignore();
+
+          // 4. Generate AI Answer using Gemini
+          final aiAnswer = await geminiService.generateAnswer(queryText);
+
+          // 5. Translate AI Answer to Tamil
+          final sarvam = ref.read(sarvamApiServiceProvider);
+          final tamilAiAnswer = await sarvam.translateText(
+            aiAnswer,
+            sourceLanguage: 'en-IN',
+            targetLanguage: 'ta-IN',
           );
+
+          setState(() {
+            _isProcessing = false;
+            _loadingMessage = null;
+            _matchedAnswer = aiAnswer;
+            _tamilAnswer = tamilAiAnswer;
+            _isAiAnswer = true;
+            _matchSimilarity = 0; // AI answer, similarity not applicable
+          });
+
+          // Speak the AI answer in Tamil
+          final tts = ref.read(textToSpeechServiceProvider);
+          await tts.speak(tamilAiAnswer, language: 'ta-IN');
 
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Question posted to community for help! 🌾'),
-              backgroundColor: AppColors.secondary,
+              content: const Text('Consulted AI & Posted to community! 🌾'),
+              backgroundColor: AppColors.primary,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           );
-          context.go('/home');
         }
 
       } else {
@@ -227,6 +261,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       _matchedAnswer = null;
       _tamilAnswer = null;
       _matchSimilarity = 0;
+      _isAiAnswer = false;
       _isProcessing = false;
     });
   }
@@ -377,27 +412,49 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.check_circle_rounded, 
-                                        size: 22, color: AppColors.success),
-                                      const SizedBox(width: 8),
-                                      Text('Answer Found!', 
-                                        style: AppTextStyles.titleSmall.copyWith(
-                                          color: AppColors.success,
-                                          fontWeight: FontWeight.bold,
-                                        )),
-                                      const Spacer(),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.success.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text('$_matchSimilarity% match',
-                                          style: AppTextStyles.labelSmall.copyWith(
-                                            color: AppColors.success,
-                                            fontWeight: FontWeight.w600,
-                                          )),
+                                      Icon(
+                                        _isAiAnswer ? Icons.auto_awesome : Icons.check_circle_rounded, 
+                                        size: 22, 
+                                        color: _isAiAnswer ? AppColors.primary : AppColors.success
                                       ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _isAiAnswer ? 'AI Suggested Answer' : 'Community Answer Found!', 
+                                          style: AppTextStyles.titleSmall.copyWith(
+                                            color: _isAiAnswer ? AppColors.primary : AppColors.success,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      if (!_isAiAnswer)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.success.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text('$_matchSimilarity% match',
+                                            style: AppTextStyles.labelSmall.copyWith(
+                                              color: AppColors.success,
+                                              fontWeight: FontWeight.w600,
+                                            )),
+                                        )
+                                      else
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text('🤖 AI',
+                                            style: AppTextStyles.labelSmall.copyWith(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.bold,
+                                            )),
+                                        ),
                                     ],
                                   ),
 
@@ -456,9 +513,9 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                         );
                                       },
                                       icon: const Icon(Icons.volume_up_rounded),
-                                      label: const Text('Listen in Tamil 🔊'),
+                                      label: Text(_isAiAnswer ? 'Listen AI Answer 🔉' : 'Listen Community Answer 🔊'),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.success,
+                                        backgroundColor: _isAiAnswer ? AppColors.primary : AppColors.success,
                                         foregroundColor: Colors.white,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(12),
@@ -466,6 +523,15 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                       ),
                                     ),
                                   ),
+                                  if (_isAiAnswer) ...[
+                                    const SizedBox(height: 12),
+                                    Text('• Question posted to community for verification', 
+                                      textAlign: TextAlign.center,
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: Colors.grey[600],
+                                        fontStyle: FontStyle.italic,
+                                      )),
+                                  ],
                                 ],
                               ),
                             ),

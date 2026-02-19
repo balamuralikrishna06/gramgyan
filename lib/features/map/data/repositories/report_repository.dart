@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../domain/models/report.dart';
 import '../../../../core/services/gemini_service.dart';
 
@@ -151,11 +152,30 @@ class ReportRepository {
     String? englishText,
     required double latitude,
     required double longitude,
+    File? audioFile,
   }) async {
     try {
+      String? audioUrl;
+      
+      // 1. Upload Audio if present
+      if (audioFile != null) {
+        final fileName = '${userId}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        await _client.storage.from('knowledge-audio').upload(
+          fileName,
+          audioFile,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        );
+        audioUrl = _client.storage.from('knowledge-audio').getPublicUrl(fileName);
+      }
+      
+      // 2. Generate Embedding
       List<double>? embedding;
       if (englishText != null && englishText.isNotEmpty) {
-        embedding = await _geminiService.generateEmbedding(englishText);
+        try {
+          embedding = await _geminiService.generateEmbedding(englishText);
+        } catch (e) {
+          debugPrint('Question Embedding Failed: $e');
+        }
       }
 
       await _client.from('questions').insert({
@@ -165,11 +185,36 @@ class ReportRepository {
         'embedding': embedding,
         'latitude': latitude,
         'longitude': longitude,
+        'audio_url': audioUrl,
+        'location': await _getLocationName(latitude, longitude), 
         'status': 'open',
       });
     } catch (e) {
       debugPrint('Error creating question: $e');
       // Non-blocking error, but good to log
     }
+  }
+
+  /// Helper to get a readable location name
+  Future<String> _getLocationName(double lat, double lng) async {
+    try {
+      if (lat == 0 && lng == 0) return 'Unknown Location';
+      
+      final placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        // Construct a simple location string: "Village, District"
+        final parts = [
+          place.subLocality, 
+          place.locality, 
+          place.administrativeArea
+        ].where((e) => e != null && e.isNotEmpty).toSet().toList(); // Remove duplicates
+        
+        return parts.isNotEmpty ? parts.join(', ') : 'Unknown Location';
+      }
+    } catch (e) {
+      debugPrint('Geocoding error: $e');
+    }
+    return 'Unknown Location';
   }
 }

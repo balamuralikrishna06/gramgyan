@@ -47,5 +47,9 @@ final userLocationProvider = FutureProvider<Position>((ref) async {
         'Location permissions are permanently denied, we cannot request permissions.');
   }
 
-  return await Geolocator.getCurrentPosition();
+  // Use High accuracy with a timeout
+  return await Geolocator.getCurrentPosition(
+    desiredAccuracy: LocationAccuracy.high,
+    timeLimit: const Duration(seconds: 10),
+  );
 });
