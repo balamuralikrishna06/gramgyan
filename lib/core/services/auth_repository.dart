@@ -1,155 +1,134 @@
 import 'dart:async';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
-import '../config/supabase_config.dart';
 import '../services/local_storage_service.dart';
+import 'backend_auth_service.dart';
 
-/// Clean repository encapsulating all Supabase authentication operations.
-/// Uses Supabase OAuth redirect flow for Google sign-in.
+/// Repository handling Firebase Authentication and Backend synchronization.
 class AuthRepository {
-  final SupabaseClient _client;
-
-  AuthRepository() : _client = Supabase.instance.client;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final BackendAuthService _backend = BackendAuthService();
 
   // ── Getters ──
 
   /// Currently authenticated user, or null.
-  User? get currentUser => _client.auth.currentUser;
-
-  /// Current session, or null.
-  Session? get currentSession => _client.auth.currentSession;
+  User? get currentUser => _auth.currentUser;
 
   /// Stream of auth state changes.
-  Stream<AuthState> get authStateChanges =>
-      _client.auth.onAuthStateChange.map((event) => event.event == AuthChangeEvent.signedIn
-          ? AuthState.authenticated
-          : AuthState.unauthenticated);
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   // ── Sign In ──
 
-  /// Sign in with Google using Supabase OAuth redirect flow.
-  /// Opens the browser for Google sign-in and redirects back to the app.
-  Future<void> signInWithGoogle() async {
-    await _client.auth.signInWithOAuth(
-      OAuthProvider.google,
-      redirectTo: SupabaseConfig.redirectUrl,
+  /// Sign in with Google.
+  Future<UserCredential> signInWithGoogle() async {
+    // Trigger the authentication flow
+    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+    if (googleUser == null) {
+      throw FirebaseAuthException(
+        code: 'ERROR_ABORTED_BY_USER',
+        message: 'Sign in aborted by user',
+      );
+    }
+
+    // Obtain the auth details from the request
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+    // Create a new credential
+    final OAuthCredential credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    // Sign in to Firebase with the Google Credential
+    return await _auth.signInWithCredential(credential);
+  }
+
+  /// Sign in with Phone Number (Verify Phone Number).
+  Future<void> verifyPhoneNumber({
+    required String phoneNumber,
+    required PhoneVerificationCompleted verificationCompleted,
+    required PhoneVerificationFailed verificationFailed,
+    required PhoneCodeSent codeSent,
+    required PhoneCodeAutoRetrievalTimeout codeAutoRetrievalTimeout,
+  }) async {
+    await _auth.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      verificationCompleted: verificationCompleted,
+      verificationFailed: verificationFailed,
+      codeSent: codeSent,
+      codeAutoRetrievalTimeout: codeAutoRetrievalTimeout,
     );
   }
 
-  // ── Sign Out ──
-
-  /// Sign out: clear Supabase session, Google session, and local flags.
-  Future<void> signOut() async {
-    await _client.auth.signOut();
-    await LocalStorageService.setProfileCompleted(false);
-    await LocalStorageService.setOnboarded(false);
+  /// Sign in with Phone OTP.
+  Future<UserCredential> signInWithOtp({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    final PhoneAuthCredential credential = PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: smsCode,
+    );
+    return await _auth.signInWithCredential(credential);
   }
 
-  // ── Profile ──
+  // ── Backend Sync ──
 
-  /// Check if user has completed the onboarding profile.
-  /// Checks local storage first. If false, checks remote DB (for existing users
-  /// on new installs). Updates local storage if remote profile exists.
-  Future<bool> checkProfileCompletion() async {
-    // 1. Check local storage (fastest)
-    if (LocalStorageService.isProfileCompleted()) {
-      return true;
-    }
-
-    // 2. Check remote Supabase DB (fallback)
+  /// Verifies Firebase token with backend and checks profile status.
+  /// Returns a map with 'profile_complete', 'user_id', and 'user_data'.
+  Future<Map<String, dynamic>> verifyWithBackend() async {
     final user = currentUser;
-    if (user == null) return false;
+    if (user == null) throw Exception('No authenticated user');
 
-    try {
-      final profile = await fetchUserProfile();
-      
-      // Check if critical fields exist (village and state are required)
-      if (profile != null && 
-          profile['city'] != null && 
-          (profile['city'] as String).isNotEmpty &&
-          profile['state'] != null &&
-          (profile['state'] as String).isNotEmpty) {
-            
-        // Sync local storage
-        await LocalStorageService.setProfileCompleted(true);
-        // Also sync other fields if needed, but profile_completed is key
-        return true;
-      }
-    } catch (_) {
-      // Network error or other issue — assume incomplete to be safe
-      return false;
-    }
+    final token = await user.getIdToken();
+    if (token == null) throw Exception('Failed to get ID Token');
 
-    return false;
+    return await _backend.firebaseLogin(token);
   }
 
-  /// Save farmer profile to Supabase `users` table.
-  Future<void> saveUserProfile({
-    required String city,
+  /// Update user profile in backend.
+  Future<void> updateProfile({
+    required String name,
     required String state,
+    required String city,
     required String language,
+    String role = 'farmer',
   }) async {
     final user = currentUser;
-    if (user == null) throw AuthException('No authenticated user.');
+    if (user == null) throw Exception('No authenticated user');
 
-    try {
-      await _client.from(SupabaseConfig.usersTable).upsert({
-        'id': user.id,
-        'email': user.email,
-        'id': user.id,
-        'email': user.email,
-        'name': user.userMetadata?['full_name'] ??
-            user.userMetadata?['name'] ??
-            user.email?.split('@').first,
-        'city': city,
-        'state': state,
-        'language': language,
-      });
-    } catch (_) {
-      // DB save failed (table missing / RLS) — non-critical.
-      // Profile will be marked complete locally below.
-    }
-
-    await LocalStorageService.setProfileCompleted(true);
+    await _backend.updateProfile(
+      firebaseUid: user.uid,
+      name: name,
+      state: state,
+      city: city,
+      language: language,
+      role: role,
+    );
   }
 
-  /// Fetch user profile from Supabase `users` table.
+  /// Fetches user profile from backend.
   Future<Map<String, dynamic>?> fetchUserProfile() async {
-    final user = currentUser;
-    if (user == null) return null;
-
     try {
-      final data = await _client
-          .from(SupabaseConfig.usersTable)
-          .select()
-          .eq('id', user.id)
-          .maybeSingle();
-      return data;
-    } catch (_) {
+      final result = await verifyWithBackend();
+      return result['user_data'] as Map<String, dynamic>?;
+    } catch (e) {
       return null;
     }
   }
 
-  // ── Private ──
+  // ── Sign Out ──
 
-  /// Upsert a basic user record on first sign-in.
-  Future<void> _upsertUserRecord(User user) async {
-    try {
-      await _client.from(SupabaseConfig.usersTable).upsert({
-        'id': user.id,
-        'email': user.email,
-        'id': user.id,
-        'email': user.email,
-        'name': user.userMetadata?['full_name'] ??
-            user.userMetadata?['name'] ??
-            user.email?.split('@').first,
-      });
-    } catch (_) {
-      // Non-critical — profile can be completed later.
-    }
+  /// Sign out from Firebase and Google.
+  Future<void> signOut() async {
+    await _googleSignIn.signOut();
+    await _auth.signOut();
+    await LocalStorageService.setProfileCompleted(false);
+    await LocalStorageService.setOnboarded(false);
   }
 }
-
-/// Simple auth state enum for the stream.
-enum AuthState { authenticated, unauthenticated }

@@ -1,4 +1,4 @@
-package com.example.gramgyan
+package com.gramgyan
 
 import io.flutter.embedding.android.FlutterActivity
 

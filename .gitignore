@@ -47,3 +47,6 @@ app.*.map.json
 # Environment Variables
 .env
 
+# Firebase
+*.json
+!android/app/google-services.json

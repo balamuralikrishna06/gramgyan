@@ -25,7 +25,7 @@ final farmerProfileProvider = FutureProvider<FarmerProfile>((ref) async {
     );
   }
 
-  final user = Supabase.instance.client.auth.currentUser;
+  final user = repo.currentUser;
   if (user == null) {
      return const FarmerProfile(
       id: '',
@@ -37,14 +37,14 @@ final farmerProfileProvider = FutureProvider<FarmerProfile>((ref) async {
       language: '',
     );
   }
-  // Try to fetch from Supabase DB
+  // Try to fetch from Backend
   final data = await repo.fetchUserProfile();
 
   if (data != null) {
     return FarmerProfile(
-      id: user.id,
+      id: user.uid,
       name: data['name'] as String? ??
-          user.userMetadata?['full_name'] as String? ??
+          user.displayName ??
           'Farmer',
       city: data['city'] as String? ?? '',
       state: data['state'] as String? ?? '',
@@ -52,15 +52,15 @@ final farmerProfileProvider = FutureProvider<FarmerProfile>((ref) async {
       totalPosts: 0,
       solutionsVerified: 0,
       language: data['language'] as String? ?? '',
-      avatarUrl: user.userMetadata?['avatar_url'] as String? ?? '',
+      avatarUrl: user.photoURL ?? '',
       badges: const [],
     );
   }
 
   // Fallback: use auth metadata only
   return FarmerProfile(
-    id: user.id,
-    name: user.userMetadata?['full_name'] as String? ??
+    id: user.uid,
+    name: user.displayName ??
         user.email?.split('@').first ??
         'Farmer',
     city: '',
@@ -68,6 +68,6 @@ final farmerProfileProvider = FutureProvider<FarmerProfile>((ref) async {
     karma: 0,
     totalPosts: 0,
     language: '',
-    avatarUrl: user.userMetadata?['avatar_url'] as String? ?? '',
+    avatarUrl: user.photoURL ?? '',
   );
 });
