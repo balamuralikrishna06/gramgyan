@@ -6,4 +6,6 @@ python-multipart==0.0.9
 pydantic-settings==2.1.0
 python-dotenv==1.0.1
 gunicorn==21.2.0
+firebase-admin==6.5.0
+supabase==2.3.0
 

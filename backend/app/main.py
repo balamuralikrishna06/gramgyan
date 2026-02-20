@@ -11,7 +11,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from app.services.firebase import initialize_firebase
+
+# ... 
+
 settings = get_settings()
+
+# Initialize Firebase
+initialize_firebase()
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -27,7 +34,13 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
+from app.routes import speech, auth
+import logging
+
+# ... imports ...
+
 app.include_router(speech.router, prefix="/api/v1/speech", tags=["speech"])
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 @app.get("/")
 async def root():
