@@ -12,6 +12,7 @@ import '../../voice/presentation/widgets/voice_recorder_widget.dart';
 import '../../home/presentation/providers/knowledge_providers.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../auth/domain/models/auth_state.dart';
+import '../../map/presentation/providers/map_providers.dart';
 import '../providers/discussion_providers.dart';
 
 /// Screen for asking a new question / recording a problem.
@@ -93,6 +94,19 @@ class _AskQuestionScreenState extends ConsumerState<AskQuestionScreen> {
       location = authState.city ?? 'Unknown Location';
     }
 
+    // 1. Get Current Location
+    double latitude = 0;
+    double longitude = 0;
+    
+    try {
+      final position = await ref.read(userLocationProvider.future);
+      latitude = position.latitude;
+      longitude = position.longitude;
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+      // Continue with 0,0 if location fails (or show error? For now fallback is ok)
+    }
+
     final repo = ref.read(discussionRepositoryProvider);
     final question = await repo.addQuestion(
       transcript: _transcript,
@@ -101,6 +115,8 @@ class _AskQuestionScreenState extends ConsumerState<AskQuestionScreen> {
       authorId: authorId,
       farmerName: farmerName,
       location: location,
+      latitude: latitude,
+      longitude: longitude,
     );
 
     // Invalidate the questions provider so next read gets fresh data

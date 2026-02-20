@@ -132,5 +132,5 @@ class AppConstants {
   
   // Main key accessor (for backward compatibility if needed, but better to use list)
   static String get geminiApiKey => geminiApiKeys.isNotEmpty ? geminiApiKeys.first : '';
-  static const String backendUrl = 'https://gramgyan.onrender.com/';
+  static const String backendUrl = 'https://gramgyan-2.onrender.com/';
 }

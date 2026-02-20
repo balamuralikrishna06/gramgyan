@@ -137,7 +137,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 error: (_, __) => const MarkerLayer(markers: []),
               ),
               CurrentLocationLayer(
-                alignPositionOnUpdate: AlignOnUpdate.never,
+                alignPositionOnUpdate: AlignOnUpdate.always,
                 style: const LocationMarkerStyle(
                   marker: DefaultLocationMarker(
                     child: Icon(
