@@ -45,7 +45,7 @@ class GeminiService:
         attempt = 0
         while attempt < max_retries:
             try:
-                response = self.model.generate_content(prompt)
+                response = await self.model.generate_content_async(prompt)
                 return response.text
             except Exception as e:
                 attempt += 1
@@ -66,7 +66,7 @@ class GeminiService:
             return await self._generate_with_retry(prompt)
         except Exception as e:
             logger.error(f"Gemini Multi-turn Answer Error: {e}")
-            return "தற்போது என்னால் பதில் அளிக்க முடியவில்லை. தயவுசெய்து சிறிது நேரம் கழித்து முயற்சிக்கவும்."
+            return f"DEBUG ERROR: {type(e).__name__} - {str(e)}"
 
     async def check_safety(self, text: str) -> dict:
         prompt = f'''
