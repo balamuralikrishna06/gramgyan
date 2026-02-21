@@ -42,12 +42,14 @@ class AuthUnauthenticated extends AuthState {
 class AuthProfileIncomplete extends AuthState {
   final String userId;
   final String email;
+  final String? phoneNumber;
   final String? displayName;
   final String? avatarUrl;
 
   const AuthProfileIncomplete({
     required this.userId,
     required this.email,
+    this.phoneNumber,
     this.displayName,
     this.avatarUrl,
   });

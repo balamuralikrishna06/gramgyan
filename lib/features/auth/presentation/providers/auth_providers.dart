@@ -48,6 +48,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
         state = app.AuthProfileIncomplete(
           userId: user.uid,
           email: user.email ?? '',
+          phoneNumber: user.phoneNumber,
           displayName: resolvedName,
           avatarUrl: user.photoURL,
         );
@@ -68,6 +69,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
       state = app.AuthProfileIncomplete(
         userId: user.uid,
         email: user.email ?? '',
+        phoneNumber: user.phoneNumber,
         displayName: user.displayName,
         avatarUrl: user.photoURL,
       );
@@ -129,7 +131,6 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
     }
   }
 
-  /// Complete profile and transition to authenticated.
   Future<void> completeProfile({
     required String name,
     required String city,
@@ -137,6 +138,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
     required String language,
     String role = 'farmer',
     String? phone,
+    String? email,
   }) async {
     state = const app.AuthLoading('Saving profile…');
     try {
@@ -147,6 +149,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
         name: name,
         role: role,
         phone: phone,
+        email: email,
       );
       
       // Force refresh of state

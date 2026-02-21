@@ -68,12 +68,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: const PhoneLoginSheet(),
-      ),
+      builder: (context) => const PhoneLoginSheet(),
     );
   }
 

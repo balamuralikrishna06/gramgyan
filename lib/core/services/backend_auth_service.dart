@@ -34,6 +34,7 @@ class BackendAuthService {
     required String language,
     String role = 'farmer',
     String? phone,
+    String? email,
   }) async {
     final body = <String, dynamic>{
       'firebase_uid': firebaseUid,
@@ -44,6 +45,7 @@ class BackendAuthService {
       'role': role,
     };
     if (phone != null && phone.isNotEmpty) body['phone'] = phone;
+    if (email != null && email.isNotEmpty) body['email'] = email;
 
     final response = await http.post(
       Uri.parse('$_baseUrl/auth/profile/update'),

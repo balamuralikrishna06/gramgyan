@@ -99,6 +99,7 @@ class AuthRepository {
     required String language,
     String role = 'farmer',
     String? phone,
+    String? email,
   }) async {
     final user = currentUser;
     if (user == null) throw Exception('No authenticated user');
@@ -111,6 +112,7 @@ class AuthRepository {
       language: language,
       role: role,
       phone: phone,
+      email: email,
     );
   }
 

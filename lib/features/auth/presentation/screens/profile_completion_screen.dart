@@ -30,6 +30,7 @@ class _ProfileCompletionScreenState
   final _villageController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   String? _selectedState;
   String? _selectedLanguage;
   String? _selectedCrop;
@@ -66,6 +67,7 @@ class _ProfileCompletionScreenState
     _villageController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -95,6 +97,9 @@ class _ProfileCompletionScreenState
           phone: _phoneController.text.trim().isEmpty
               ? null
               : '+91${_phoneController.text.trim()}',
+          email: _emailController.text.trim().isEmpty
+              ? null
+              : _emailController.text.trim(),
         );
   }
 
@@ -105,14 +110,22 @@ class _ProfileCompletionScreenState
     final authState = ref.watch(authStateProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Cache user details to prevent flicker during loading state
+    String? currentEmail;
+    String? currentPhone;
+
     // Extract user info from auth state and update cache
     if (authState is AuthProfileIncomplete) {
       _cachedDisplayName = authState.displayName;
       _cachedAvatarUrl = authState.avatarUrl;
+      currentEmail = authState.email;
+      currentPhone = authState.phoneNumber;
       if (_nameController.text.isEmpty && authState.displayName != null) {
         _nameController.text = authState.displayName!;
       }
     }
+
+    final isPhoneLogin = currentPhone != null && currentPhone.isNotEmpty;
 
     // Use live-typed name for card display; fall back to cached Firebase name
     final displayName = _liveDisplayName.isNotEmpty ? _liveDisplayName : null;
@@ -286,32 +299,54 @@ class _ProfileCompletionScreenState
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Phone Number (optional for Google users) ──
-                  _buildLabel('Phone Number (Optional)'),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _phoneController,
-                    enabled: !isLoading,
-                    keyboardType: TextInputType.phone,
-                    maxLength: 10,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                    decoration: InputDecoration(
-                      hintText: 'Enter 10-digit mobile number',
-                      prefixText: '+91 ',
-                      prefixIcon: const Icon(Icons.phone_outlined),
-                      prefixIconColor: isDark
-                          ? AppColors.primaryLight
-                          : AppColors.primary,
-                      counterText: '',
+                  // ── Phone or Email Number (optional) ──
+                  if (isPhoneLogin) ...[
+                    _buildLabel('Email (Optional)'),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _emailController,
+                      enabled: !isLoading,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        hintText: 'Enter your email address',
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        prefixIconColor: isDark
+                            ? AppColors.primaryLight
+                            : AppColors.primary,
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null; // optional
+                        if (!v.contains('@')) return 'Enter a valid email';
+                        return null;
+                      },
                     ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return null; // optional
-                      if (v.trim().length != 10) return 'Enter a valid 10-digit number';
-                      return null;
-                    },
-                  ),
+                  ] else ...[
+                    _buildLabel('Phone Number (Optional)'),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _phoneController,
+                      enabled: !isLoading,
+                      keyboardType: TextInputType.phone,
+                      maxLength: 10,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      decoration: InputDecoration(
+                        hintText: 'Enter 10-digit mobile number',
+                        prefixText: '+91 ',
+                        prefixIcon: const Icon(Icons.phone_outlined),
+                        prefixIconColor: isDark
+                            ? AppColors.primaryLight
+                            : AppColors.primary,
+                        counterText: '',
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null; // optional
+                        if (v.trim().length != 10) return 'Enter a valid 10-digit number';
+                        return null;
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 20),
 
                   // ── State ──
