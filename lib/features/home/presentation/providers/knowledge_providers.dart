@@ -1,11 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../domain/models/knowledge_post.dart';
-import '../../data/repositories/mock_knowledge_repository.dart';
+import '../../data/repositories/supabase_knowledge_repository.dart';
 
 /// Repository provider (singleton).
-final knowledgeRepositoryProvider = Provider<MockKnowledgeRepository>((ref) {
-  return MockKnowledgeRepository();
+final knowledgeRepositoryProvider = Provider<SupabaseKnowledgeRepository>((ref) {
+  return SupabaseKnowledgeRepository(Supabase.instance.client);
 });
 
 /// Currently selected category filter.

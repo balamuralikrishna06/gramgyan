@@ -78,6 +78,10 @@ class ReportRepository {
     required String userId,
     required double latitude,
     required double longitude,
+    required String farmerName,
+    required String location,
+    required String crop,
+    required String category,
     File? audioFile,
     required String manualTranscript,
     String? translatedText,
@@ -129,6 +133,10 @@ class ReportRepository {
         'user_id': userId,
         'latitude': latitude,
         'longitude': longitude,
+        'farmer_name': farmerName,
+        'location': location,
+        'crop': crop,
+        'category': category,
         'original_text': manualTranscript,
         'english_text': translatedText,
         'language': language, 
@@ -173,6 +181,10 @@ class ReportRepository {
       await _client.from('knowledge_posts').insert({
         'submission_id': submission['id'],
         'user_id': submission['user_id'],
+        'farmer_name': submission['farmer_name'],
+        'location': submission['location'],
+        'crop': submission['crop'] ?? 'Other',
+        'category': submission['category'] ?? 'Crops',
         'original_text': submission['original_text'],
         'english_text': submission['english_text'],
         'language': submission['language'],
@@ -272,7 +284,7 @@ class ReportRepository {
         'latitude': latitude,
         'longitude': longitude,
         'audio_url': audioUrl,
-        'location': await _getLocationName(latitude, longitude), 
+        'location': await getLocationName(latitude, longitude), 
         'status': 'open',
       });
     } catch (e) {
@@ -282,7 +294,7 @@ class ReportRepository {
   }
 
   /// Helper to get a readable location name
-  Future<String> _getLocationName(double lat, double lng) async {
+  Future<String> getLocationName(double lat, double lng) async {
     try {
       if (lat == 0 && lng == 0) return 'Unknown Location';
       

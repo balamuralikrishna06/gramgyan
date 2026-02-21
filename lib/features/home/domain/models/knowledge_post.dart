@@ -59,23 +59,25 @@ class KnowledgePost {
     );
   }
 
-  /// Parse from JSON map (for mock data).
+  /// Parse from JSON map (for mock data and Supabase).
   factory KnowledgePost.fromJson(Map<String, dynamic> json) {
     return KnowledgePost(
       id: json['id'] as String,
-      farmerName: json['farmerName'] as String,
-      location: json['location'] as String,
-      crop: json['crop'] as String,
-      transcript: json['transcript'] as String,
-      audioUrl: json['audioUrl'] as String,
-      karma: json['karma'] as int,
-      verified: json['verified'] as bool,
-      latitude: (json['latitude'] as num).toDouble(),
-      longitude: (json['longitude'] as num).toDouble(),
-      category: json['category'] as String? ?? 'Crops',
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
+      farmerName: (json['farmer_name'] ?? json['farmerName'] ?? 'Unknown Farmer') as String,
+      location: (json['location'] ?? 'Unknown Location') as String,
+      crop: (json['crop'] ?? 'Other') as String,
+      transcript: (json['original_text'] ?? json['transcript'] ?? '') as String,
+      audioUrl: (json['audio_url'] ?? json['audioUrl'] ?? '') as String,
+      karma: (json['karma'] as num?)?.toInt() ?? 0,
+      verified: (json['is_verified'] ?? json['verified'] ?? false) as bool,
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      category: (json['category'] ?? 'Crops') as String,
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at'] as String)
+          : (json['createdAt'] != null
+              ? DateTime.parse(json['createdAt'] as String)
+              : DateTime.now()),
     );
   }
 

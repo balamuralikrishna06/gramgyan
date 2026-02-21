@@ -13,6 +13,7 @@ import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/discussion/screens/ask_question_screen.dart';
 import '../../features/discussion/screens/discussion_detail_screen.dart';
 import '../../features/discussion/screens/add_solution_screen.dart';
+import '../../features/home/presentation/screens/knowledge_detail_screen.dart';
 import '../../features/ai_insight/presentation/screens/ai_insight_screen.dart';
 import '../../features/climate/presentation/screens/climate_screen.dart';
 import '../../features/voice/presentation/screens/voice_interaction_screen.dart';
@@ -140,6 +141,30 @@ final appRouter = GoRouter(
         final id = state.pathParameters['id']!;
         return CustomTransitionPage(
           child: DiscussionDetailScreen(questionId: id),
+          transitionsBuilder:
+              (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1, 0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: child,
+            );
+          },
+        );
+      },
+    ),
+
+    // ── Knowledge Detail (full screen, outside shell) ──
+    GoRoute(
+      path: '/knowledge/:id',
+      pageBuilder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return CustomTransitionPage(
+          child: KnowledgeDetailScreen(postId: id),
           transitionsBuilder:
               (context, animation, secondaryAnimation, child) {
             return SlideTransition(

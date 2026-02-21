@@ -373,6 +373,10 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           userId: userId,
           latitude: lat,
           longitude: lng,
+          farmerName: Supabase.instance.client.auth.currentUser?.userMetadata?['full_name'] ?? 'Farmer',
+          location: await repo.getLocationName(lat, lng), // Will need to make this public or implement here
+          crop: 'General',
+          category: 'Crops',
           audioFile: File(_audioPath!),
           manualTranscript: _transcript!,
           translatedText: _translation, 
