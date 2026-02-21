@@ -14,6 +14,9 @@ class BackendAuthService {
       Uri.parse('$_baseUrl/auth/firebase-login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'token': token}),
+    ).timeout(
+      const Duration(seconds: 15),
+      onTimeout: () => throw Exception('Backend request timed out. Server may be waking up — please try again.'),
     );
 
     if (response.statusCode == 200) {
@@ -30,18 +33,25 @@ class BackendAuthService {
     required String city,
     required String language,
     String role = 'farmer',
+    String? phone,
   }) async {
+    final body = <String, dynamic>{
+      'firebase_uid': firebaseUid,
+      'name': name,
+      'state': state,
+      'city': city,
+      'language': language,
+      'role': role,
+    };
+    if (phone != null && phone.isNotEmpty) body['phone'] = phone;
+
     final response = await http.post(
       Uri.parse('$_baseUrl/auth/profile/update'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'firebase_uid': firebaseUid,
-        'name': name,
-        'state': state,
-        'city': city,
-        'language': language,
-        'role': role,
-      }),
+      body: jsonEncode(body),
+    ).timeout(
+      const Duration(seconds: 15),
+      onTimeout: () => throw Exception('Backend request timed out. Please try again.'),
     );
 
     if (response.statusCode == 200) {

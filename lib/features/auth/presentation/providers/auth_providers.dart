@@ -35,9 +35,6 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
 
   /// Handle a successful sign-in event from Firebase.
   Future<void> _handleSignedIn(User user) async {
-    // state = const app.AuthLoading('Verifying profile...'); 
-    // Commented out loading state to avoid flickering if already authenticated
-    
     try {
       final backendData = await _repo.verifyWithBackend();
       final isProfileComplete = backendData['profile_complete'] as bool? ?? false;
@@ -61,7 +58,15 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
         );
       }
     } catch (e) {
-      state = app.AuthError(e.toString());
+      // Backend unreachable (e.g. Render sleeping, no network).
+      // Fallback: treat as profile-incomplete so user can still log in / complete profile.
+      // This prevents infinite loading on the splash screen.
+      state = app.AuthProfileIncomplete(
+        userId: user.uid,
+        email: user.email ?? '',
+        displayName: user.displayName,
+        avatarUrl: user.photoURL,
+      );
     }
   }
 
@@ -127,6 +132,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
     required String selectedState,
     required String language,
     String role = 'farmer',
+    String? phone,
   }) async {
     state = const app.AuthLoading('Saving profile…');
     try {
@@ -136,6 +142,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
         language: language,
         name: name,
         role: role,
+        phone: phone,
       );
       
       // Force refresh of state

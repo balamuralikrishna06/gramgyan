@@ -29,6 +29,7 @@ class _ProfileCompletionScreenState
   final _formKey = GlobalKey<FormState>();
   final _villageController = TextEditingController();
   final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   String? _selectedState;
   String? _selectedLanguage;
   String? _selectedCrop;
@@ -56,6 +57,7 @@ class _ProfileCompletionScreenState
     _fadeController.dispose();
     _villageController.dispose();
     _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -82,6 +84,9 @@ class _ProfileCompletionScreenState
           city: _villageController.text.trim(),
           selectedState: _selectedState!,
           language: _selectedLanguage!,
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : '+91${_phoneController.text.trim()}',
         );
   }
 
@@ -270,6 +275,34 @@ class _ProfileCompletionScreenState
                     ),
                     validator: (v) =>
                         (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Phone Number (optional for Google users) ──
+                  _buildLabel('Phone Number (Optional)'),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _phoneController,
+                    enabled: !isLoading,
+                    keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    decoration: InputDecoration(
+                      hintText: 'Enter 10-digit mobile number',
+                      prefixText: '+91 ',
+                      prefixIcon: const Icon(Icons.phone_outlined),
+                      prefixIconColor: isDark
+                          ? AppColors.primaryLight
+                          : AppColors.primary,
+                      counterText: '',
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null; // optional
+                      if (v.trim().length != 10) return 'Enter a valid 10-digit number';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 20),
 
