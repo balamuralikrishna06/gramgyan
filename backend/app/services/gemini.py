@@ -63,14 +63,10 @@ class GeminiService:
     async def generate_answer(self, query: str) -> str:
         prompt = f'Provide a clear, simple agricultural solution for this farmer question: "{query}". Keep the answer concise and easy to understand for a farmer. The answer MUST be in Tamil language.'
         try:
-            if not self.api_keys:
-                return f"DEBUG: Model has 0 API keys loaded. Key env length: {len(settings.GEMINI_API_KEYS) if settings.GEMINI_API_KEYS else 0}"
-            if not hasattr(self, 'model'):
-                return "DEBUG: model is not initialized."
             return await self._generate_with_retry(prompt)
         except Exception as e:
             logger.error(f"Gemini Multi-turn Answer Error: {e}")
-            return f"DEBUG ERROR: {str(e)}"
+            return "தற்போது என்னால் பதில் அளிக்க முடியவில்லை. தயவுசெய்து சிறிது நேரம் கழித்து முயற்சிக்கவும்."
 
     async def check_safety(self, text: str) -> dict:
         prompt = f'''
