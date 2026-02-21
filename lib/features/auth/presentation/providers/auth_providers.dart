@@ -44,9 +44,12 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
       final dbName = userData['name'] as String?;
       final resolvedName = (dbName != null && dbName.isNotEmpty) ? dbName : user.displayName;
 
+      // Supabase internal UUID
+      final supabaseUserId = backendData['user_id'] as String?;
+
       if (!isProfileComplete) {
         state = app.AuthProfileIncomplete(
-          userId: user.uid,
+          userId: supabaseUserId ?? user.uid, // Supabase UUID preferred
           email: user.email ?? '',
           phoneNumber: user.phoneNumber,
           displayName: resolvedName,
@@ -54,7 +57,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
         );
       } else {
         state = app.AuthAuthenticated(
-          userId: user.uid,
+          userId: supabaseUserId ?? user.uid, // Supabase UUID preferred
           email: user.email ?? '',
           displayName: resolvedName,
           avatarUrl: user.photoURL,
