@@ -40,18 +40,22 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
       final isProfileComplete = backendData['profile_complete'] as bool? ?? false;
       final userData = backendData['user_data'] as Map<String, dynamic>? ?? {};
 
+      // Prefer name from Supabase DB over Firebase (phone users have no Firebase displayName)
+      final dbName = userData['name'] as String?;
+      final resolvedName = (dbName != null && dbName.isNotEmpty) ? dbName : user.displayName;
+
       if (!isProfileComplete) {
         state = app.AuthProfileIncomplete(
           userId: user.uid,
           email: user.email ?? '',
-          displayName: user.displayName,
+          displayName: resolvedName,
           avatarUrl: user.photoURL,
         );
       } else {
         state = app.AuthAuthenticated(
           userId: user.uid,
           email: user.email ?? '',
-          displayName: user.displayName,
+          displayName: resolvedName,
           avatarUrl: user.photoURL,
           city: userData['city'] as String?,
           role: userData['role'] as String? ?? 'farmer',

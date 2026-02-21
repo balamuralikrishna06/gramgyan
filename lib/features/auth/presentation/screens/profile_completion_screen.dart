@@ -38,6 +38,12 @@ class _ProfileCompletionScreenState
   String? _cachedDisplayName;
   String? _cachedAvatarUrl;
 
+  // Live name shown in the profile card (updates as user types)
+  String get _liveDisplayName =>
+      _nameController.text.trim().isNotEmpty
+          ? _nameController.text.trim()
+          : (_cachedDisplayName ?? '');
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +56,8 @@ class _ProfileCompletionScreenState
       curve: Curves.easeOut,
     );
     _fadeController.forward();
+    // Rebuild card header when user types their name
+    _nameController.addListener(() => setState(() {}));
   }
 
   @override
@@ -106,8 +114,8 @@ class _ProfileCompletionScreenState
       }
     }
 
-    // Use cached values if state is loading (prevent fallback to 'Farmer')
-    final displayName = _cachedDisplayName;
+    // Use live-typed name for card display; fall back to cached Firebase name
+    final displayName = _liveDisplayName.isNotEmpty ? _liveDisplayName : null;
     final avatarUrl = _cachedAvatarUrl;
 
     // Navigate on authenticated
