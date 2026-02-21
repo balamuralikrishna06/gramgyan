@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     SARVAM_API_KEY: str
     SARVAM_API_KEY_2: str = ""  # Fallback key if primary hits quota
+    GEMINI_API_KEY: str = "" # Add this in Render Env
+    GEMINI_API_KEYS: str = "" # Comma separated for rotation
     DEBUG: bool = False
     
     # Auth & Database
