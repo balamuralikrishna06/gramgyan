@@ -21,6 +21,7 @@ class ProfileUpdateRequest(BaseModel):
     city: str
     language: str
     role: str = "farmer"
+    phone: Optional[str] = None
 
 @router.post("/firebase-login")
 async def firebase_login(request: LoginRequest):
@@ -125,6 +126,8 @@ async def update_profile(request: ProfileUpdateRequest):
             "language": request.language,
             "role": request.role
         }
+        if request.phone:
+            update_data["phone"] = request.phone
         
         response = supabase.table("users").update(update_data).eq("firebase_uid", request.firebase_uid).execute()
         
