@@ -52,7 +52,7 @@ async def firebase_login(request: LoginRequest):
         is_new_user = False
 
         if not user_data:
-            # 2.1. Fallback: Check if user exists by PHONE (to link old accounts)
+            # 2.1. Fallback: Check if user exists by PHONE or EMAIL (to link old accounts)
             if phone:
                 phone_response = supabase.table("users").select("*").eq("phone", phone).execute()
                 if phone_response.data:
@@ -65,8 +65,38 @@ async def firebase_login(request: LoginRequest):
                     # Refresh user_data
                     user_data = [existing_user]
                     user_data[0]["firebase_uid"] = firebase_uid
+                elif email:
+                    # Check email as secondary fallback
+                    email_response = supabase.table("users").select("*").eq("email", email).execute()
+                    if email_response.data:
+                        # Link existing user
+                        existing_user = email_response.data[0]
+                        user_id = existing_user["id"]
+                        # Update firebase_uid
+                        supabase.table("users").update({"firebase_uid": firebase_uid}).eq("id", user_id).execute()
+                        
+                        # Refresh user_data
+                        user_data = [existing_user]
+                        user_data[0]["firebase_uid"] = firebase_uid
+                    else:
+                        is_new_user = True
                 else:
                     is_new_user = True
+            elif email:
+                 # Check email as primary fallback if phone is missing
+                 email_response = supabase.table("users").select("*").eq("email", email).execute()
+                 if email_response.data:
+                     # Link existing user
+                     existing_user = email_response.data[0]
+                     user_id = existing_user["id"]
+                     # Update firebase_uid
+                     supabase.table("users").update({"firebase_uid": firebase_uid}).eq("id", user_id).execute()
+                     
+                     # Refresh user_data
+                     user_data = [existing_user]
+                     user_data[0]["firebase_uid"] = firebase_uid
+                 else:
+                     is_new_user = True
             else:
                 is_new_user = True
 
