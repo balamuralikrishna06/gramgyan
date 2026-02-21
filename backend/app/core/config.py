@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "GramGyan Backend"
     API_V1_STR: str = "/api/v1"
     SARVAM_API_KEY: str
+    SARVAM_API_KEY_2: str = ""  # Fallback key if primary hits quota
     DEBUG: bool = False
     
     # Auth & Database
