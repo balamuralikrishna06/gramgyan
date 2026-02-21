@@ -165,10 +165,9 @@ class ReportRepository {
   /// Approves a submission.
   /// 1. Updates submission status to 'approved'.
   /// 2. Inserts into 'knowledge_posts' (Verified Layer).
-  Future<void> approveSubmission(Map<String, dynamic> submission) async {
+  Future<void> approveSubmission(Map<String, dynamic> submission, {required String userId}) async {
     try {
-      final userId = _client.auth.currentUser?.id;
-      if (userId == null) throw Exception('User not authenticated');
+      if (userId.isEmpty) throw Exception('User not authenticated (userId is empty)');
 
       // 1. Insert into Verified Layer
       await _client.from('knowledge_posts').insert({
