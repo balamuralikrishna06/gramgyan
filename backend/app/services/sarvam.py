@@ -153,7 +153,7 @@ async def text_to_speech(text: str, language_code: str = "ta-IN") -> bytes:
                 payload = {
                     "inputs": [text],
                     "target_language_code": language_code,
-                    "speaker": "kavitha",
+                    "speaker": "shubh",
                     "model": "bulbul:v3",
                 }
 

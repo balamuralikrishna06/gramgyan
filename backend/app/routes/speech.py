@@ -137,3 +137,20 @@ async def speak_text(request: SpeakRequest):
         return StreamingResponse(iterfile(), media_type="audio/wav")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/stream")
+async def stream_text(text: str, language_code: str = "ta-IN"):
+    """
+    GET endpoint for instant streaming via audio players.
+    """
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    try:
+        audio_content = await text_to_speech(text, language_code)
+        
+        def iterfile():
+            yield audio_content
+            
+        return StreamingResponse(iterfile(), media_type="audio/wav")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

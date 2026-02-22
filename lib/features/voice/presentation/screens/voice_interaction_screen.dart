@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,12 +48,28 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   String? _matchedAudioUrl;
   final AudioPlayer _audioPlayer = AudioPlayer();
   
+  // TTS State
+  StreamSubscription<PlayerState>? _ttsSubscription;
+  bool _isTtsPlaying = false;
+  
   // Image State
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
 
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      _ttsSubscription = ref.read(textToSpeechServiceProvider).onPlayerStateChanged.listen((state) {
+        if (mounted) setState(() => _isTtsPlaying = state == PlayerState.playing);
+      });
+    });
+  }
+
+  @override
   void dispose() {
+    _ttsSubscription?.cancel();
+    ref.read(textToSpeechServiceProvider).stop();
     _audioPlayer.dispose();
     super.dispose();
   }
@@ -767,26 +784,28 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                   ],
 
                                   // English Answer (secondary)
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      const Text('🌐', style: TextStyle(fontSize: 16)),
-                                      const SizedBox(width: 6),
-                                      Text('English', 
-                                        style: AppTextStyles.labelMedium.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey,
-                                        )),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _matchedAnswer!,
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      height: 1.5,
-                                      color: Colors.grey[600],
+                                  if (!_isAiAnswer) ...[
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      children: [
+                                        const Text('🌐', style: TextStyle(fontSize: 16)),
+                                        const SizedBox(width: 6),
+                                        Text('English', 
+                                          style: AppTextStyles.labelMedium.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey,
+                                          )),
+                                      ],
                                     ),
-                                  ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _matchedAnswer!,
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                        height: 1.5,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
 
                                   // Listen Again button
                                   const SizedBox(height: 16),
@@ -794,19 +813,30 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
-                                        if (_matchedAudioUrl != null) {
-                                           await _audioPlayer.stop();
-                                           await _audioPlayer.play(UrlSource(_matchedAudioUrl!));
-                                        } else {
+                                        if (_isAiAnswer) {
                                           final tts = ref.read(textToSpeechServiceProvider);
-                                          tts.speak(
-                                            _tamilAnswer ?? _matchedAnswer!,
-                                            language: 'ta-IN',
-                                          );
+                                          if (_isTtsPlaying) {
+                                            await tts.stop();
+                                          } else {
+                                            tts.speak(_tamilAnswer ?? _matchedAnswer!, language: 'ta-IN');
+                                          }
+                                        } else {
+                                          if (_matchedAudioUrl != null) {
+                                             await _audioPlayer.stop();
+                                             await _audioPlayer.play(UrlSource(_matchedAudioUrl!));
+                                          } else {
+                                            // Fallback for community answer without audio
+                                            final tts = ref.read(textToSpeechServiceProvider);
+                                            tts.speak(_tamilAnswer ?? _matchedAnswer!, language: 'ta-IN');
+                                          }
                                         }
                                       },
-                                      icon: const Icon(Icons.volume_up_rounded),
-                                      label: Text(_isAiAnswer ? 'Listen AI Answer 🔉' : 'Listen Community Answer 🔊'),
+                                      icon: Icon(_isAiAnswer && _isTtsPlaying ? Icons.stop_circle_rounded : Icons.volume_up_rounded),
+                                      label: Text(
+                                        _isAiAnswer 
+                                          ? (_isTtsPlaying ? 'Stop TTS ⏹' : 'Listen AI Answer 🔉') 
+                                          : 'Listen Community Answer 🔊'
+                                      ),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: _isAiAnswer ? AppColors.primary : AppColors.success,
                                         foregroundColor: Colors.white,

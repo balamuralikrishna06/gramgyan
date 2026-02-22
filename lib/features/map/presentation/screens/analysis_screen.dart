@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_tts/flutter_tts.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -35,7 +35,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   Map<String, dynamic>? _matchData;
   String? _aiAnswer;
   
-  final FlutterTts _flutterTts = FlutterTts();
   bool _isPlaying = false;
 
   @override
@@ -45,8 +44,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   }
 
   @override
-  void dispose() {
-    _flutterTts.stop();
+    ref.read(textToSpeechServiceProvider).stop();
     super.dispose();
   }
 
@@ -115,24 +113,21 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   }
 
   Future<void> _speak(String text) async {
-    await _flutterTts.setLanguage("en-IN"); // Default to English/Indian for MVP
-    // If Tamil text is detected, switch (simple check)
-    // In production, use user preference
+    final tts = ref.read(textToSpeechServiceProvider);
+    
+    String lang = "en-IN";
     if (RegExp(r'[\u0B80-\u0BFF]').hasMatch(text)) {
-       await _flutterTts.setLanguage("ta-IN");
+       lang = "ta-IN";
     }
 
-    await _flutterTts.setPitch(1.0);
-    await _flutterTts.speak(text);
     setState(() => _isPlaying = true);
-
-    _flutterTts.setCompletionHandler(() {
-      if (mounted) setState(() => _isPlaying = false);
-    });
+    await tts.speak(text, language: lang);
+    if (mounted) setState(() => _isPlaying = false);
   }
 
   Future<void> _stopSpeaking() async {
-    await _flutterTts.stop();
+    final tts = ref.read(textToSpeechServiceProvider);
+    await tts.stop();
     if (mounted) setState(() => _isPlaying = false);
   }
 
