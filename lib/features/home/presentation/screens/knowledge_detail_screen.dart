@@ -427,11 +427,15 @@ class _InfoRow extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        Text(
-          value,
-          style: AppTextStyles.titleSmall.copyWith(
-            color: Theme.of(context).colorScheme.onSurface,
-            fontWeight: FontWeight.w700,
+        Flexible(
+          flex: 2,
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: AppTextStyles.titleSmall.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],

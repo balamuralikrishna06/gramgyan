@@ -9,6 +9,8 @@ import '../../../auth/domain/models/auth_state.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../map/presentation/providers/map_providers.dart';
 import '../../../../core/providers/service_providers.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AnalysisScreen extends ConsumerStatefulWidget {
   final String originalText;
@@ -52,7 +54,18 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     final repo = ref.read(reportRepositoryProvider);
     final gemini = ref.read(geminiServiceProvider);
     final authState = ref.read(authStateProvider);
-    final userId = (authState is AuthAuthenticated) ? authState.userId : 'anon';
+    
+    String? userId;
+    if (authState is AuthAuthenticated) {
+      userId = authState.userId;
+    } else if (authState is AuthProfileIncomplete) {
+      userId = authState.userId;
+    } else {
+      userId = Supabase.instance.client.auth.currentUser?.id;
+    }
+    
+    final farmerProfile = await ref.read(farmerProfileProvider.future);
+    final farmerName = farmerProfile.name;
     
     // 1. Use preloaded matches or search for similar knowledge
     final List<Map<String, dynamic>> matches;
@@ -77,7 +90,8 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       // NO MATCH -> AI FALLBACK
       // 1. Create Question (Async)
       repo.createQuestion(
-        userId: userId, 
+        userId: userId,
+        farmerName: farmerName,
         originalText: widget.originalText,
         englishText: widget.translatedText,
         latitude: 0, // Should be passed ideally

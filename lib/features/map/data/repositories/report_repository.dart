@@ -5,6 +5,7 @@ import 'package:geocoding/geocoding.dart';
 import '../../domain/models/report.dart';
 import '../../../../core/services/gemini_service.dart';
 import '../../../../core/constants/app_constants.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ReportRepository {
   final SupabaseClient _client;
@@ -75,7 +76,7 @@ class ReportRepository {
   /// Creates a new submission in 'knowledge_submissions' table (Pending Verification).
   /// Generates embeddings and checks AI safety.
   Future<void> createKnowledgePost({
-    required String userId,
+    String? userId,
     required double latitude,
     required double longitude,
     required String farmerName,
@@ -88,11 +89,41 @@ class ReportRepository {
     String language = 'Unknown',
   }) async {
     try {
+      String? actualUserId = userId;
+      String? actualFarmerName = farmerName;
+
+      // Ensure we have a valid UUID and Farmer Name by cross-referencing with users table
+      final fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser != null) {
+        try {
+          final userResp = await _client.from('users').select('id, name').eq('firebase_uid', fbUser.uid).maybeSingle();
+          if (userResp != null) {
+            actualUserId = userResp['id'] as String?;
+            final dbName = userResp['name'] as String?;
+            if (dbName != null && dbName.trim().isNotEmpty) {
+               actualFarmerName = dbName.trim();
+            }
+          } else {
+            actualUserId = null;
+          }
+        } catch (e) {
+          debugPrint('Error cross-referencing user profile in knowledge post: $e');
+        }
+      }
+
+      // Final sanitization of inputs
+      if (actualUserId != null && (actualUserId.isEmpty || !actualUserId.contains('-'))) {
+        actualUserId = null; // Do not send invalid UUID
+      }
+      if (actualFarmerName != null && actualFarmerName.trim().isEmpty) {
+        actualFarmerName = 'Farmer';
+      }
+
       String? audioUrl;
       
       // 1. Upload Audio if present
       if (audioFile != null) {
-        final fileName = '${userId}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        final fileName = '${actualUserId ?? 'anon'}_${DateTime.now().millisecondsSinceEpoch}.m4a';
         await _client.storage.from('knowledge-audio').upload(
           fileName,
           audioFile,
@@ -130,10 +161,10 @@ class ReportRepository {
 
       // 4. Insert into 'knowledge_submissions' (Pending Layer)
       await _client.from('knowledge_submissions').insert({
-        'user_id': userId,
+        if (actualUserId != null) 'user_id': actualUserId,
         'latitude': latitude,
         'longitude': longitude,
-        'farmer_name': farmerName,
+        if (actualFarmerName != null) 'farmer_name': actualFarmerName,
         'location': location,
         'crop': crop,
         'category': category,
@@ -245,7 +276,8 @@ class ReportRepository {
 
   /// Creates a question record when no matching knowledge is found.
   Future<void> createQuestion({
-    required String userId,
+    String? userId,
+    String? farmerName,
     required String originalText,
     String? englishText,
     required double latitude,
@@ -253,6 +285,37 @@ class ReportRepository {
     File? audioFile,
   }) async {
     try {
+      String? actualUserId = userId;
+      String? actualFarmerName = farmerName;
+
+      // Ensure we have a valid UUID and Farmer Name by cross-referencing with users table
+      final fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser != null) {
+        try {
+          final userResp = await _client.from('users').select('id, name').eq('firebase_uid', fbUser.uid).maybeSingle();
+          if (userResp != null) {
+            actualUserId = userResp['id'] as String?;
+            final dbName = userResp['name'] as String?;
+            if (dbName != null && dbName.trim().isNotEmpty) {
+               actualFarmerName = dbName.trim();
+            }
+          } else {
+            // User does not exist in 'users' table, so any local UUID would violate foreign keys
+            actualUserId = null;
+          }
+        } catch (e) {
+          debugPrint('Error cross-referencing user profile: $e');
+        }
+      }
+
+      // Final sanitization of inputs
+      if (actualUserId != null && !actualUserId.contains('-')) {
+        actualUserId = null; // Do not send invalid UUID
+      }
+      if (actualFarmerName != null && actualFarmerName.trim().isEmpty) {
+        actualFarmerName = 'Farmer';
+      }
+
       String? audioUrl;
       
       // 1. Upload Audio if present
@@ -277,7 +340,8 @@ class ReportRepository {
       }
 
       await _client.from('questions').insert({
-        'user_id': userId,
+        if (actualUserId != null && actualUserId.contains('-')) 'user_id': actualUserId,
+        if (actualFarmerName != null) 'farmer_name': actualFarmerName,
         'original_text': originalText,
         'english_text': englishText,
         'embedding': embedding,
@@ -289,7 +353,7 @@ class ReportRepository {
       });
     } catch (e) {
       debugPrint('Error creating question: $e');
-      // Non-blocking error, but good to log
+      throw Exception('Failed to create question: $e');
     }
   }
 

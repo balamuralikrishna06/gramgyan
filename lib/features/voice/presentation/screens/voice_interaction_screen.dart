@@ -17,6 +17,7 @@ import '../../../../core/providers/service_providers.dart';
 import '../../../discussion/providers/discussion_providers.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
 import '../widgets/voice_recorder_widget.dart';
 
 enum VoiceMode { ask, share }
@@ -102,7 +103,20 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
     try {
       final authState = ref.read(authStateProvider);
-      final userId = (authState is AuthAuthenticated) ? authState.userId : 'anon';
+      
+      // Real user id (either AuthAuthenticated or Supabase login)
+      String? userId;
+      if (authState is AuthAuthenticated) {
+        userId = authState.userId;
+      } else if (authState is AuthProfileIncomplete) {
+        userId = authState.userId;
+      } else {
+        userId = Supabase.instance.client.auth.currentUser?.id;
+      }
+      
+      // Get farmer name from profile provider
+      final farmerProfile = await ref.read(farmerProfileProvider.future);
+      final farmerName = farmerProfile.name;
       
       // Get location
       double lat = 0;
@@ -314,15 +328,26 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           // ❌ NO MATCH → Post to Community + Get AI Answer
           setState(() => _loadingMessage = 'Posting to community & consulting AI...');
           
-          // Post to community discussion in background
-          repo.createQuestion(
-            userId: userId,
-            originalText: _transcript!,
-            englishText: _translation,
-            latitude: lat,
-            longitude: lng,
-            audioFile: File(_audioPath!),
-          ).ignore();
+          // Post to community discussion and await it so it crashes visibly if columns are missing
+          try {
+            await repo.createQuestion(
+              userId: userId,
+              farmerName: farmerName,
+              originalText: _transcript!,
+              englishText: _translation,
+              latitude: lat,
+              longitude: lng,
+              audioFile: File(_audioPath!),
+            );
+          } catch (e) {
+            if (mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                 content: Text(e.toString()),
+                 backgroundColor: Colors.red,
+                 duration: const Duration(seconds: 10),
+               ));
+            }
+          }
 
           // Generate AI Answer using Gemini
           final aiAnswer = await geminiService.generateAnswer(queryText);
@@ -370,7 +395,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
         // Use createKnowledgePost for Sharing (Handles Embeddings)
         await repo.createKnowledgePost(
-          userId: userId,
+          userId: userId ?? '',
           latitude: lat,
           longitude: lng,
           farmerName: Supabase.instance.client.auth.currentUser?.userMetadata?['full_name'] ?? 'Farmer',
