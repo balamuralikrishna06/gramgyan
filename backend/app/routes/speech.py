@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
 from app.services.sarvam import speech_to_text, text_to_speech, translate_text
 import shutil
@@ -71,7 +71,11 @@ async def translate(request: TranslateRequest):
 
 @router.post("/process")
 @router.post("/process-audio")
-async def process_audio(file: UploadFile = File(...), source_language: str = "ta-IN", target_language: str = "en-IN"):
+async def process_audio(
+    file: UploadFile = File(...), 
+    source_language: str = Form("ta-IN"), 
+    target_language: str = Form("en-IN")
+):
     """
     Full workflow: Upload Audio -> STT -> Translate -> Return JSON.
     """
@@ -91,19 +95,13 @@ async def process_audio(file: UploadFile = File(...), source_language: str = "ta
         if not transcript or not transcript.strip():
              translation = ""
         else:
-             if is_tamil(transcript):
-                 # It's Tamil, proceed with translation to English
-                 detected_source_lang = "ta-IN"
-                 detected_target_lang = "en-IN"
-                 translation = await translate_text(transcript, detected_source_lang, detected_target_lang)
-             else:
-                 # It's likely English (or at least not Tamil), so we treat it as English
+             if detected_source_lang == "en-IN":
                  # User Requirement: "if it is english no need for translation"
-                 detected_source_lang = "en-IN"
-                 # We set translation same as transcript so the UI shows it clearly in the "Translation" box too,
-                 # or we could leave it empty. Setting it to transcript makes the "English Translation" field useful.
+                 # We set translation same as transcript so the UI shows it clearly in the "Translation" box too.
                  translation = transcript 
-                 detected_target_lang = "en-IN"
+             else:
+                 # Translate to the target language (default en-IN)
+                 translation = await translate_text(transcript, detected_source_lang, detected_target_lang)
 
         return ProcessResponse(
             transcript=transcript,

@@ -36,7 +36,7 @@ class SarvamApiService {
 
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  Future<SarvamProcessResponse> processAudio(String filePath) async {
+  Future<SarvamProcessResponse> processAudio(String filePath, {String sourceLanguage = 'ta-IN'}) async {
     final uri = Uri.parse('$_baseUrl/process');
     
     var request = http.MultipartRequest('POST', uri);
@@ -47,7 +47,7 @@ class SarvamApiService {
     ));
 
     // Add fields if needed
-    request.fields['source_language'] = 'ta-IN';
+    request.fields['source_language'] = sourceLanguage;
     request.fields['target_language'] = 'en-IN';
 
     try {
