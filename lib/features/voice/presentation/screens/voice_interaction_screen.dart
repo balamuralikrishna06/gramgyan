@@ -254,13 +254,15 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
              // Standard Flow (English -> user's language)
              setState(() => _loadingMessage = 'Translating diagnosis...');
              final sarvam = ref.read(sarvamApiServiceProvider);
-             final userLangCode = ref.read(languageProvider) ?? 'en';
+             final userLangCode = _getUserLangCode();
              final userSarvamCode = toSarvamCode(userLangCode);
-             final nativeSummary = await sarvam.translateText(
-                englishSummary,
-                sourceLanguage: 'en-IN',
-                targetLanguage: userSarvamCode,
-              );
+             final nativeSummary = userSarvamCode == 'en-IN' 
+               ? englishSummary 
+               : await sarvam.translateText(
+                   englishSummary,
+                   sourceLanguage: 'en-IN',
+                   targetLanguage: userSarvamCode,
+                 );
               
               setState(() {
                 _isProcessing = false;
@@ -317,11 +319,13 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           final sarvam = ref.read(sarvamApiServiceProvider);
           final userLangCode = _getUserLangCode();
           final userSarvamCode = toSarvamCode(userLangCode);
-          final nativeAnswer = await sarvam.translateText(
-            answerText,
-            sourceLanguage: 'en-IN',
-            targetLanguage: userSarvamCode,
-          );
+          final nativeAnswer = userSarvamCode == 'en-IN'
+            ? answerText
+            : await sarvam.translateText(
+                answerText,
+                sourceLanguage: 'en-IN',
+                targetLanguage: userSarvamCode,
+              );
 
           setState(() {
             _isProcessing = false;
@@ -382,11 +386,13 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           final sarvam = ref.read(sarvamApiServiceProvider);
           final userLangCode = _getUserLangCode();
           final userSarvamCode = toSarvamCode(userLangCode);
-          final nativeAiAnswer = await sarvam.translateText(
-            aiAnswer,
-            sourceLanguage: 'en-IN',
-            targetLanguage: userSarvamCode,
-          );
+          final nativeAiAnswer = userSarvamCode == 'en-IN'
+            ? aiAnswer
+            : await sarvam.translateText(
+                aiAnswer,
+                sourceLanguage: 'en-IN',
+                targetLanguage: userSarvamCode,
+              );
 
           // Show answer + start TTS simultaneously
           final tts = ref.read(textToSpeechServiceProvider);
