@@ -315,7 +315,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           // Translate answer to user's native language using Sarvam
           setState(() => _loadingMessage = 'Translating to your language...');
           final sarvam = ref.read(sarvamApiServiceProvider);
-          final userLangCode = ref.read(languageProvider) ?? 'en';
+          final userLangCode = _getUserLangCode();
           final userSarvamCode = toSarvamCode(userLangCode);
           final nativeAnswer = await sarvam.translateText(
             answerText,
@@ -380,7 +380,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
           // Translate AI Answer to user's native language
           final sarvam = ref.read(sarvamApiServiceProvider);
-          final userLangCode = ref.read(languageProvider) ?? 'en';
+          final userLangCode = _getUserLangCode();
           final userSarvamCode = toSarvamCode(userLangCode);
           final nativeAiAnswer = await sarvam.translateText(
             aiAnswer,
@@ -416,7 +416,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       } else {
         // --- SHARE KNOWLEDGE FLOW ---
         // Get current language name (e.g., 'Tamil', 'English')
-        final languageCode = ref.read(languageProvider) ?? 'en';
+        final languageCode = _getUserLangCode();
         final languageName = AppConstants.supportedLanguages.firstWhere(
           (l) => l['code'] == languageCode,
           orElse: () => {'english': 'Unknown'},
@@ -945,11 +945,23 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   /// Uses the language code captured when the answer was generated — avoids
   /// label/content mismatch from provider state changes.
   String _getLanguageLabel() {
-    final langCode = _answerLangCode ?? ref.read(languageProvider) ?? 'en';
+    final langCode = _answerLangCode ?? _getUserLangCode();
     final lang = AppConstants.supportedLanguages.firstWhere(
       (l) => l['code'] == langCode,
       orElse: () => {'name': 'Answer', 'english': 'Answer'},
     );
     return '${lang['english']} Answer';
+  }
+
+  /// Returns the user's language code directly from AuthAuthenticated.language
+  /// (populated from Supabase users table — no Hive race condition).
+  /// Falls back to languageProvider for situations where auth state is unavailable.
+  String _getUserLangCode() {
+    final authState = ref.read(authStateProvider);
+    if (authState is AuthAuthenticated && authState.language != null) {
+      return authState.language!;
+    }
+    // Fallback to Hive-backed provider
+    return ref.read(languageProvider) ?? 'en';
   }
 }
