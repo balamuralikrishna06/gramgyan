@@ -61,7 +61,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
       } else {
         // ── Sync language from Supabase → languageProvider ──
         final dbLanguage = userData['language'] as String?;
-        if (dbLanguage != null) _syncLanguage(dbLanguage);
+        final langCode = dbLanguage != null ? _syncLanguage(dbLanguage) : null;
 
         state = app.AuthAuthenticated(
           userId: supabaseUserId ?? user.uid,
@@ -70,6 +70,7 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
           avatarUrl: user.photoURL,
           city: userData['city'] as String?,
           role: userData['role'] as String? ?? 'farmer',
+          language: langCode,  // Directly from Supabase — no Hive race condition
         );
       }
     } catch (e) {
@@ -87,9 +88,8 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
   }
 
   /// Maps the DB language English name (e.g. 'Tamil') → short code ('ta')
-  /// and persists it in languageProvider + Hive.
-  void _syncLanguage(String dbLanguageName) {
-    // Find the matching code from supportedLanguages
+  /// Persists it in languageProvider + Hive. Returns the resolved code.
+  String? _syncLanguage(String dbLanguageName) {
     final match = AppConstants.supportedLanguages.firstWhere(
       (l) => l['english']!.toLowerCase() == dbLanguageName.toLowerCase() ||
              l['name'] == dbLanguageName ||
@@ -99,7 +99,9 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
     final code = match['code'];
     if (code != null && code.isNotEmpty) {
       _ref.read(languageProvider.notifier).setLanguage(code);
+      return code;
     }
+    return null;
   }
 
   @override

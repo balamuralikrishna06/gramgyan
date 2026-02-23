@@ -22,6 +22,7 @@ class AuthAuthenticated extends AuthState {
   final String? avatarUrl;
   final String? city;
   final String role; // 'farmer', 'expert', 'admin'
+  final String? language; // Language code e.g. 'ta', 'en', 'hi' from users table
 
   const AuthAuthenticated({
     required this.userId,
@@ -30,6 +31,7 @@ class AuthAuthenticated extends AuthState {
     this.avatarUrl,
     this.city,
     this.role = 'farmer',
+    this.language,
   });
 }
 
