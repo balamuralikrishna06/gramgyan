@@ -165,7 +165,7 @@ If in doubt, FLAG AS UNSAFE.
         if not text: return None
         return await self._generate_embedding_with_rotation(text, "RETRIEVAL_QUERY")
 
-    async def analyze_crop_disease(self, image_bytes: bytes, query: str) -> str:
+    async def analyze_crop_disease(self, image_bytes: bytes, query: str, language: str = "English") -> str:
         prompt_text = f'''
 Role: You are the "Gram Gyan" Senior Multimodal Agronomist. Your mission is to support rural farmers in India by identifying crop diseases and providing actionable, safe, and culturally relevant farming advice.
 
@@ -188,7 +188,7 @@ Return ONLY a JSON object with this structure:
 }},
 "prevention_tips": ["tip 1", "tip 2"],
 "radar_severity": "LOW" | "MEDIUM" | "HIGH",
-"summary_for_farmer": "A friendly, empathetic summary STRICTLY IN TAMIL language."
+"summary_for_farmer": "A friendly, empathetic summary STRICTLY IN {language} language."
 }}
 '''
         try:
@@ -201,6 +201,6 @@ Return ONLY a JSON object with this structure:
             return response_text.strip()
         except Exception as e:
             logger.error(f"Gemini Crop Analysis Error: {e}")
-            return 'பிழை: பயிரை பகுப்பாய்வு செய்ய முடியவில்லை.'
+            return 'Error: Unable to analyze the crop image.'
 
 gemini_service = GeminiService()

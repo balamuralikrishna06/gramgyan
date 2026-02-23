@@ -177,7 +177,8 @@ class GeminiService {
   }
 
   /// Analyzes a crop image and query to diagnose diseases using backend Multimodal input.
-  Future<String> analyzeCropDisease(File imageFile, String query) async {
+  /// [language] should be a display name like "English" or "Tamil".
+  Future<String> analyzeCropDisease(File imageFile, String query, {String language = 'English'}) async {
     try {
       final uri = Uri.parse('$_baseUrl/analyze-crop');
       var request = http.MultipartRequest('POST', uri);
@@ -187,21 +188,22 @@ class GeminiService {
         imageFile.path,
       ));
       request.fields['query'] = query;
+      request.fields['language'] = language;
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        return data['analysis'] ?? 'பிழை: பகுப்பாய்வு உருவாக்கப்படவில்லை.';
+        return data['analysis'] ?? 'Error: No analysis returned.';
       } else {
         debugPrint('Gemini Crop Analysis HTTP Error: ${response.statusCode} - ${response.body}');
-        return 'பிழை: பயிரை பகுப்பாய்வு செய்ய முடியவில்லை.';
+        return 'Error: Unable to analyze the crop image.';
       }
 
     } catch (e) {
       debugPrint('Gemini Crop Analysis Error: $e');
-      return 'பிழை: பயிரை பகுப்பாய்வு செய்ய முடியவில்லை. \${e.toString()}';
+      return 'Error: Unable to analyze the crop image. ${e.toString()}';
     }
   }
 }

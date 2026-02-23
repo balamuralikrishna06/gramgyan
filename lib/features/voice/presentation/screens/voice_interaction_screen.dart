@@ -193,7 +193,12 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           // Use translation or transcript or default query
           final queryText = _translation ?? _transcript ?? 'What is wrong with this crop?';
           
-          final analysisJson = await geminiService.analyzeCropDisease(_selectedImage!, queryText);
+          final imageLangCode = ref.read(languageProvider);
+          final analysisJson = await geminiService.analyzeCropDisease(
+            _selectedImage!,
+            queryText,
+            language: GeminiService.langCodeToName(imageLangCode),
+          );
           
           String englishSummary = analysisJson;
           
@@ -255,7 +260,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
              // Standard Flow (English -> user's language)
              setState(() => _loadingMessage = 'Translating diagnosis...');
              final sarvam = ref.read(sarvamApiServiceProvider);
-             final userLangCode = _getUserLangCode();
+             final userLangCode = ref.read(languageProvider) ?? 'en';
              final userSarvamCode = toSarvamCode(userLangCode);
              final nativeSummary = userSarvamCode == 'en-IN' 
                ? englishSummary 
@@ -318,7 +323,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           // Translate answer to user's native language using Sarvam
           setState(() => _loadingMessage = 'Translating to your language...');
           final sarvam = ref.read(sarvamApiServiceProvider);
-          final userLangCode = _getUserLangCode();
+          final userLangCode = ref.read(languageProvider) ?? 'en';
           final userSarvamCode = toSarvamCode(userLangCode);
           final nativeAnswer = userSarvamCode == 'en-IN'
             ? answerText
@@ -381,7 +386,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           }
 
           // Generate AI Answer using Gemini in the user's language directly
-          final userLangCode = _getUserLangCode();
+          final userLangCode = ref.read(languageProvider) ?? 'en';
           final userSarvamCode = toSarvamCode(userLangCode);
           final userLangName = GeminiService.langCodeToName(userLangCode);
           final aiAnswer = await geminiService.generateAnswer(queryText, language: userLangName);
@@ -415,7 +420,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       } else {
         // --- SHARE KNOWLEDGE FLOW ---
         // Get current language name (e.g., 'Tamil', 'English')
-        final languageCode = _getUserLangCode();
+        final languageCode = ref.read(languageProvider) ?? 'en';
         final languageName = AppConstants.supportedLanguages.firstWhere(
           (l) => l['code'] == languageCode,
           orElse: () => {'english': 'Unknown'},
@@ -497,7 +502,11 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                 children: [
                    IconButton(
                     icon: const Icon(Icons.close_rounded, size: 28),
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      ref.read(textToSpeechServiceProvider).stop();
+                      _audioPlayer.stop();
+                      context.pop();
+                    },
                   ),
                 ],
               ),

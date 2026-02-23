@@ -113,8 +113,10 @@ class _ChatInteractionScreenState extends ConsumerState<ChatInteractionScreen> {
 
       if (imageToAnalyze != null) {
         // Multimodal Analysis
+        final userLangCode = ref.read(languageProvider);
+        final userLangName = GeminiService.langCodeToName(userLangCode);
         final query = text.isNotEmpty ? text : "Diagnose this crop issue.";
-        final jsonResponse = await geminiService.analyzeCropDisease(imageToAnalyze, query);
+        final jsonResponse = await geminiService.analyzeCropDisease(imageToAnalyze, query, language: userLangName);
         
         // Parse friendly summary from JSON
         try {
@@ -123,7 +125,7 @@ class _ChatInteractionScreenState extends ConsumerState<ChatInteractionScreen> {
            if (data.containsKey('summary_for_farmer')) {
              responseText = data['summary_for_farmer'];
            } else {
-             responseText = "பகுப்பாய்வு முடிந்தது. விவரங்களை கீழே காணவும்:\n$cleanJson";
+             responseText = "Analysis complete. Details:\n$cleanJson";
            }
         } catch (e) {
            responseText = jsonResponse; // Fallback to raw text
