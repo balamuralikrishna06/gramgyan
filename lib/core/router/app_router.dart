@@ -18,6 +18,7 @@ import '../../features/ai_insight/presentation/screens/ai_insight_screen.dart';
 import '../../features/climate/presentation/screens/climate_screen.dart';
 import '../../features/voice/presentation/screens/voice_interaction_screen.dart';
 import '../../features/chat/presentation/screens/chat_interaction_screen.dart';
+import '../../features/home/presentation/screens/notifications_screen.dart';
 import '../widgets/app_shell.dart';
 
 /// GoRouter configuration for the app.
@@ -271,6 +272,26 @@ final appRouter = GoRouter(
              // Slide up from bottom
             position: Tween<Offset>(
               begin: const Offset(0, 1),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            )),
+            child: child,
+          );
+        },
+      ),
+    ),
+
+    // ── Notifications (full screen) ──
+    GoRoute(
+      path: '/notifications',
+      pageBuilder: (context, state) => CustomTransitionPage(
+        child: const NotificationsScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1, 0),
               end: Offset.zero,
             ).animate(CurvedAnimation(
               parent: animation,

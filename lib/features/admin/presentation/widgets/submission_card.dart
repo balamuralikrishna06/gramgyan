@@ -132,6 +132,48 @@ class _SubmissionCardState extends State<SubmissionCard> {
               ),
             ],
 
+            // Display Question Context if this is an Answer
+            if (widget.submission['questions'] != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.help_outline_rounded, size: 16, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Answering Question:',
+                          style: TextStyle(
+                            color: Colors.blue[800],
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.submission['questions']['english_text'] ??
+                      widget.submission['questions']['original_text'] ?? 'Unknown Question',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Audio Player
             if (hasAudio) ...[
               const SizedBox(height: 16),

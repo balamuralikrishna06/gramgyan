@@ -186,12 +186,121 @@ class ReportRepository {
 
   // ── Admin / Expert Methods ──
 
+  /// Submits an answer to a question for moderation.
+  Future<void> submitAnswerForModeration({
+    String? userId,
+    required String questionId,
+    required double latitude,
+    required double longitude,
+    required String farmerName,
+    required String location,
+    File? audioFile,
+    required String manualTranscript,
+    String? translatedText,
+    String language = 'Unknown',
+  }) async {
+    try {
+      String? actualUserId = userId;
+      String? actualFarmerName = farmerName;
+
+      // Ensure we have a valid UUID and Farmer Name by cross-referencing with users table
+      final fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser != null) {
+        try {
+          final userResp = await _client.from('users').select('id, name').eq('firebase_uid', fbUser.uid).maybeSingle();
+          if (userResp != null) {
+            actualUserId = userResp['id'] as String?;
+            final dbName = userResp['name'] as String?;
+            if (dbName != null && dbName.trim().isNotEmpty) {
+               actualFarmerName = dbName.trim();
+            }
+          } else {
+            actualUserId = null;
+          }
+        } catch (e) {
+          debugPrint('Error cross-referencing user profile in answer post: $e');
+        }
+      }
+
+      // Final sanitization of inputs
+      if (actualUserId != null && (actualUserId.isEmpty || !actualUserId.contains('-'))) {
+        actualUserId = null; // Do not send invalid UUID
+      }
+      if (actualFarmerName != null && actualFarmerName.trim().isEmpty) {
+        actualFarmerName = 'Farmer';
+      }
+
+      String? audioUrl;
+      
+      // 1. Upload Audio if present
+      if (audioFile != null) {
+        final fileName = '${actualUserId ?? 'anon'}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        await _client.storage.from('knowledge-audio').upload(
+          fileName,
+          audioFile,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        );
+        audioUrl = _client.storage.from('knowledge-audio').getPublicUrl(fileName);
+      }
+
+      final String effectiveTranslatedText = translatedText ?? '';
+      final textToProcess = effectiveTranslatedText.isNotEmpty ? effectiveTranslatedText : manualTranscript;
+
+      // 2. Generate Embedding (Gemini)
+      List<double>? embedding;
+      try {
+        if (textToProcess.isNotEmpty) {
+           embedding = await _geminiService.generateEmbedding(textToProcess);
+        }
+      } catch (e) {
+        debugPrint('Embedding generation failed: $e');
+      }
+
+      // 3. AI Safety Check
+      bool aiFlagged = false;
+      String? aiReason;
+      try {
+        if (textToProcess.isNotEmpty) {
+          final safetyResult = await _geminiService.checkSafety(textToProcess);
+          aiFlagged = !safetyResult.isSafe;
+          aiReason = safetyResult.reason;
+        }
+      } catch (e) {
+        debugPrint('Safety check failed: $e');
+      }
+
+      // 4. Insert into 'knowledge_submissions' (Pending Layer) with question_id
+      await _client.from('knowledge_submissions').insert({
+        if (actualUserId != null) 'user_id': actualUserId,
+        'question_id': questionId,
+        'latitude': latitude,
+        'longitude': longitude,
+        if (actualFarmerName != null) 'farmer_name': actualFarmerName,
+        'location': location,
+        'original_text': manualTranscript,
+        'english_text': translatedText,
+        'language': language, 
+        'audio_url': audioUrl,
+        'created_at': DateTime.now().toIso8601String(),
+        'embedding': embedding,
+        'ai_flagged': aiFlagged,
+        'ai_reason': aiReason,
+        'moderation_status': 'pending', 
+      });
+
+    } catch (e) {
+      throw Exception('Failed to create answer submission: $e');
+    }
+  }
+
+  // ── Admin / Expert Methods ──
+
   /// Fetches all pending submissions for moderation.
   Future<List<Map<String, dynamic>>> getPendingSubmissions() async {
     try {
       final response = await _client
           .from('knowledge_submissions')
-          .select()
+          .select('*, questions(original_text, english_text)')
           .eq('moderation_status', 'pending')
           .order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
@@ -208,26 +317,65 @@ class ReportRepository {
     try {
       if (userId.isEmpty) throw Exception('User not authenticated (userId is empty)');
 
-      // 1. Insert into Verified Layer
-      await _client.from('knowledge_posts').insert({
-        'submission_id': submission['id'],
-        'user_id': submission['user_id'],
-        'farmer_name': submission['farmer_name'],
-        'location': submission['location'],
-        'crop': submission['crop'] ?? 'Other',
-        'category': submission['category'] ?? 'Crops',
-        'original_text': submission['original_text'],
-        'english_text': submission['english_text'],
-        'language': submission['language'],
-        'audio_url': submission['audio_url'],
-        'latitude': submission['latitude'],
-        'longitude': submission['longitude'],
-        'embedding': submission['embedding'],
-        'is_verified': true,
-        'verified_by': userId,
-        'verified_at': DateTime.now().toIso8601String(),
-        'created_at': DateTime.now().toIso8601String(),
-      });
+      final isAnswer = submission['question_id'] != null;
+
+      if (isAnswer) {
+        // 1. Insert into Answers
+        await _client.from('answers').insert({
+          'question_id': submission['question_id'],
+          'user_id': submission['user_id'],
+          'farmer_name': submission['farmer_name'],
+          'answer_text': submission['english_text'] ?? submission['original_text'],
+          'audio_url': submission['audio_url'],
+          'karma': 10,
+          'is_verified': true,
+        });
+
+        // 2. Increment question reply count
+        try {
+          await _client.rpc('increment_reply_count', params: {
+            'q_id': submission['question_id'],
+          });
+        } catch (e) {
+          debugPrint('Could not increment reply count: $e');
+        }
+
+        // 3. Create Notification for the Asker
+        try {
+           final questionData = await _client.from('questions').select('user_id').eq('id', submission['question_id']).maybeSingle();
+           if (questionData != null && questionData['user_id'] != null) {
+              await _client.from('notifications').insert({
+                 'user_id': questionData['user_id'],
+                 'title': 'Your Question has a new Answer',
+                 'message': 'An expert has answered your agricultural question!',
+                 'question_id': submission['question_id'],
+              });
+           }
+        } catch (e) {
+           debugPrint('Could not create notification: $e');
+        }
+      } else {
+        // 1. Insert into Verified Layer
+        await _client.from('knowledge_posts').insert({
+          'submission_id': submission['id'],
+          'user_id': submission['user_id'],
+          'farmer_name': submission['farmer_name'],
+          'location': submission['location'],
+          'crop': submission['crop'] ?? 'Other',
+          'category': submission['category'] ?? 'Crops',
+          'original_text': submission['original_text'],
+          'english_text': submission['english_text'],
+          'language': submission['language'],
+          'audio_url': submission['audio_url'],
+          'latitude': submission['latitude'],
+          'longitude': submission['longitude'],
+          'embedding': submission['embedding'],
+          'is_verified': true,
+          'verified_by': userId,
+          'verified_at': DateTime.now().toIso8601String(),
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
 
       // 2. Update Submission Status
       await _client
