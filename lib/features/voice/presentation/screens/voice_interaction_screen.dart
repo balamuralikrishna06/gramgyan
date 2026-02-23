@@ -43,6 +43,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   // State for matched answer
   String? _matchedAnswer;
   String? _nativeAnswer;  // Answer in user's native language
+  String? _answerLangCode; // Language code used to generate _nativeAnswer (e.g. 'ta')
   int _matchSimilarity = 0;
   bool _isAiAnswer = false;
   String? _matchedAudioUrl;
@@ -239,6 +240,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
               _loadingMessage = null;
               _matchedAnswer = newEnglish; // Fixed English
               _nativeAnswer = nativeSummary;
+              _answerLangCode = userLangCode;
               _isAiAnswer = true;
               _matchSimilarity = 0;
               _matchedAudioUrl = null;
@@ -265,6 +267,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                 _loadingMessage = null;
                 _matchedAnswer = englishSummary;
                 _nativeAnswer = nativeSummary;
+                _answerLangCode = userLangCode;
                 _isAiAnswer = true;
                 _matchSimilarity = 0;
                 _matchedAudioUrl = null;
@@ -325,6 +328,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
             _loadingMessage = null;
             _matchedAnswer = answerText;
             _nativeAnswer = nativeAnswer;
+            _answerLangCode = userLangCode;
             _matchSimilarity = similarity.toInt();
             _isAiAnswer = false;
           });
@@ -391,6 +395,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
             _loadingMessage = null;
             _matchedAnswer = aiAnswer;
             _nativeAnswer = nativeAiAnswer;
+            _answerLangCode = userLangCode;
             _isAiAnswer = true;
             _matchSimilarity = 0;
           });
@@ -937,12 +942,14 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   }
 
   /// Returns a display label for the user's native language answer section.
+  /// Uses the language code captured when the answer was generated — avoids
+  /// label/content mismatch from provider state changes.
   String _getLanguageLabel() {
-    final langCode = ref.read(languageProvider) ?? 'en';
+    final langCode = _answerLangCode ?? ref.read(languageProvider) ?? 'en';
     final lang = AppConstants.supportedLanguages.firstWhere(
       (l) => l['code'] == langCode,
       orElse: () => {'name': 'Answer', 'english': 'Answer'},
     );
-    return '${lang['name']} Answer';
+    return '${lang['english']} Answer';
   }
 }
