@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/language_provider.dart';
 import '../../../../core/services/auth_repository.dart';
 import '../../domain/models/auth_state.dart' as app;
 
@@ -14,15 +16,16 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 /// Auth state notifier — manages the auth state machine.
 final authStateProvider =
     StateNotifierProvider<AuthNotifier, app.AuthState>((ref) {
-  return AuthNotifier(ref.read(authRepositoryProvider));
+  return AuthNotifier(ref.read(authRepositoryProvider), ref);
 });
 
 /// StateNotifier controlling authentication state transitions.
 class AuthNotifier extends StateNotifier<app.AuthState> {
   final AuthRepository _repo;
+  final Ref _ref;
   StreamSubscription<User?>? _authSub;
 
-  AuthNotifier(this._repo) : super(const app.AuthInitial()) {
+  AuthNotifier(this._repo, this._ref) : super(const app.AuthInitial()) {
     // Listen for Firebase auth changes
     _authSub = _repo.authStateChanges.listen((User? user) {
       if (user != null) {
@@ -49,15 +52,19 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
 
       if (!isProfileComplete) {
         state = app.AuthProfileIncomplete(
-          userId: supabaseUserId ?? user.uid, // Supabase UUID preferred
+          userId: supabaseUserId ?? user.uid,
           email: user.email ?? '',
           phoneNumber: user.phoneNumber,
           displayName: resolvedName,
           avatarUrl: user.photoURL,
         );
       } else {
+        // ── Sync language from Supabase → languageProvider ──
+        final dbLanguage = userData['language'] as String?;
+        if (dbLanguage != null) _syncLanguage(dbLanguage);
+
         state = app.AuthAuthenticated(
-          userId: supabaseUserId ?? user.uid, // Supabase UUID preferred
+          userId: supabaseUserId ?? user.uid,
           email: user.email ?? '',
           displayName: resolvedName,
           avatarUrl: user.photoURL,
@@ -76,6 +83,22 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
         displayName: user.displayName,
         avatarUrl: user.photoURL,
       );
+    }
+  }
+
+  /// Maps the DB language English name (e.g. 'Tamil') → short code ('ta')
+  /// and persists it in languageProvider + Hive.
+  void _syncLanguage(String dbLanguageName) {
+    // Find the matching code from supportedLanguages
+    final match = AppConstants.supportedLanguages.firstWhere(
+      (l) => l['english']!.toLowerCase() == dbLanguageName.toLowerCase() ||
+             l['name'] == dbLanguageName ||
+             l['code'] == dbLanguageName,
+      orElse: () => {},
+    );
+    final code = match['code'];
+    if (code != null && code.isNotEmpty) {
+      _ref.read(languageProvider.notifier).setLanguage(code);
     }
   }
 
@@ -154,7 +177,10 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
         phone: phone,
         email: email,
       );
-      
+
+      // Immediately sync language to languageProvider so STT uses the right code
+      _syncLanguage(language);
+
       // Force refresh of state
       final user = _repo.currentUser;
       if (user != null) {
