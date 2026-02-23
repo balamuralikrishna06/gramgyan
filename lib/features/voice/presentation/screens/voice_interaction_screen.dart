@@ -244,9 +244,9 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
               _matchedAudioUrl = null;
             });
 
-              // Speak the result in user's language
+              // Speak the result in user's language (fire-and-forget for instant response)
               final tts = ref.read(textToSpeechServiceProvider);
-              await tts.speak(nativeSummary, language: userSarvamCode);
+              unawaited(tts.speak(nativeSummary, language: userSarvamCode));
               
           } else {
              // Standard Flow (English -> user's language)
@@ -270,9 +270,9 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                 _matchedAudioUrl = null;
               });
 
-              // Speak the result in user's language
+              // Speak the result in user's language (fire-and-forget for instant response)
               final tts = ref.read(textToSpeechServiceProvider);
-              await tts.speak(nativeSummary, language: userSarvamCode);
+              unawaited(tts.speak(nativeSummary, language: userSarvamCode));
           }
 
           if (!mounted) return;
@@ -341,10 +341,9 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           } else {
              debugPrint('No original audio, using TTS.');
              final tts = ref.read(textToSpeechServiceProvider);
-             await tts.speak(nativeAnswer, language: userSarvamCode);
-             setState(() {
-               _matchedAudioUrl = null;
-             });
+             // Fire-and-forget — audio loads in background while UI is already showing
+             unawaited(tts.speak(nativeAnswer, language: userSarvamCode));
+             setState(() => _matchedAudioUrl = null);
           }
 
         } else {
@@ -385,6 +384,8 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
             targetLanguage: userSarvamCode,
           );
 
+          // Show answer + start TTS simultaneously
+          final tts = ref.read(textToSpeechServiceProvider);
           setState(() {
             _isProcessing = false;
             _loadingMessage = null;
@@ -393,10 +394,8 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
             _isAiAnswer = true;
             _matchSimilarity = 0;
           });
-
-          // Speak the AI answer in user's native language
-          final tts = ref.read(textToSpeechServiceProvider);
-          await tts.speak(nativeAiAnswer, language: userSarvamCode);
+          // Fire TTS immediately — audio loads while user reads the answer
+          unawaited(tts.speak(nativeAiAnswer, language: userSarvamCode));
 
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(

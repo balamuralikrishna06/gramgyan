@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'package:flutter/foundation.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -18,23 +19,25 @@ class TextToSpeechService {
   Future<void> speak(String text, {String language = 'ta-IN'}) async {
     if (text.trim().isEmpty) return;
 
-    // Stop current playback if active
-    await stop();
+    // Stop any current playback without awaiting (non-blocking)
+    unawaited(_audioPlayer.stop());
 
     try {
       _isPlaying = true;
-      
+
       final uri = Uri.parse('${AppConstants.backendUrl}api/v1/speech/stream').replace(
         queryParameters: {
           'text': text,
           'language_code': language,
         },
       );
-      
+
+      // play() returns as soon as playback starts — does not block until audio ends
       await _audioPlayer.play(UrlSource(uri.toString()));
 
     } catch (e) {
-      debugPrint('Error playing Sarvam TTS: $e');
+      _isPlaying = false;
+      debugPrint('TTS Error: $e');
     }
   }
 
