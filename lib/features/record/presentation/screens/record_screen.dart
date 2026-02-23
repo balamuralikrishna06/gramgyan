@@ -12,6 +12,7 @@ import '../../../map/presentation/providers/map_providers.dart';
 import '../../../../core/providers/service_providers.dart';
 import '../../../map/presentation/screens/solution_screen.dart';
 import '../../../voice/presentation/widgets/voice_recorder_widget.dart'; 
+import '../../../../core/providers/language_provider.dart';
 
 /// Record Knowledge Screen — voice-first with centered glowing mic,
 /// waveform animation, AI transcript card, and action buttons.
@@ -183,7 +184,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                 onRecordingStopped: () {
                    // Logic moved to onResult for processing completion
                 },
-                initialLocale: 'ta_IN', 
+                initialLocale: toSarvamCode(ref.read(languageProvider)),
               ),
 
             // ── AI Transcript Card & Form ──

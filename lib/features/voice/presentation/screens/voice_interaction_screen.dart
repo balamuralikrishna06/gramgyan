@@ -42,7 +42,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
   // State for matched answer
   String? _matchedAnswer;
-  String? _tamilAnswer;
+  String? _nativeAnswer;  // Answer in user's native language
   int _matchSimilarity = 0;
   bool _isAiAnswer = false;
   String? _matchedAudioUrl;
@@ -216,59 +216,63 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
             debugPrint('⚠️ Warning: AI returned Hindi/Devanagari text in English field.');
             // Strategy: Translate this "Hindi" English summary to Actual English first, or directly to Tamil
             // Let's try to translate it to Tamil directly, but setting source to 'hi-IN'
-             final sarvam = ref.read(sarvamApiServiceProvider);
+          final sarvam = ref.read(sarvamApiServiceProvider);
+          
+          // 1. Translate Hindi -> user's native language
+          final userLangCode = ref.read(languageProvider) ?? 'en';
+          final userSarvamCode = toSarvamCode(userLangCode);
+          final nativeSummary = await sarvam.translateText(
+             englishSummary,
+             sourceLanguage: 'hi-IN', // Correct the source
+             targetLanguage: userSarvamCode,
+           );
+
+           // 2. Translate Hindi -> English (for display)
+           final newEnglish = await sarvam.translateText(
+             englishSummary,
+             sourceLanguage: 'hi-IN',
+             targetLanguage: 'en-IN',
+           );
              
-             // 1. Translate Hindi -> Tamil
-             final tamilSummary = await sarvam.translateText(
-                englishSummary,
-                sourceLanguage: 'hi-IN', // Correct the source
-                targetLanguage: 'ta-IN',
-              );
+           setState(() {
+              _isProcessing = false;
+              _loadingMessage = null;
+              _matchedAnswer = newEnglish; // Fixed English
+              _nativeAnswer = nativeSummary;
+              _isAiAnswer = true;
+              _matchSimilarity = 0;
+              _matchedAudioUrl = null;
+            });
 
-             // 2. Translate Hindi -> English (for display)
-             final newEnglish = await sarvam.translateText(
-                englishSummary,
-                sourceLanguage: 'hi-IN',
-                targetLanguage: 'en-IN',
-              );
-              
-             setState(() {
-                _isProcessing = false;
-                _loadingMessage = null;
-                _matchedAnswer = newEnglish; // Fixed English
-                _tamilAnswer = tamilSummary;
-                _isAiAnswer = true;
-                _matchSimilarity = 0;
-                _matchedAudioUrl = null;
-              });
-
-              // Speak the result
+              // Speak the result in user's language
               final tts = ref.read(textToSpeechServiceProvider);
-              await tts.speak(tamilSummary, language: 'ta-IN');
+              await tts.speak(nativeSummary, language: userSarvamCode);
               
           } else {
-             // Standard Flow (English -> Tamil)
+             // Standard Flow (English -> user's language)
              setState(() => _loadingMessage = 'Translating diagnosis...');
              final sarvam = ref.read(sarvamApiServiceProvider);
-             final tamilSummary = await sarvam.translateText(
+             final userLangCode = ref.read(languageProvider) ?? 'en';
+             final userSarvamCode = toSarvamCode(userLangCode);
+             final nativeSummary = await sarvam.translateText(
                 englishSummary,
                 sourceLanguage: 'en-IN',
-                targetLanguage: 'ta-IN',
+                targetLanguage: userSarvamCode,
               );
               
               setState(() {
                 _isProcessing = false;
                 _loadingMessage = null;
                 _matchedAnswer = englishSummary;
-                _tamilAnswer = tamilSummary;
+                _nativeAnswer = nativeSummary;
                 _isAiAnswer = true;
                 _matchSimilarity = 0;
                 _matchedAudioUrl = null;
               });
 
-              // Speak the result
+              // Speak the result in user's language
               final tts = ref.read(textToSpeechServiceProvider);
-              await tts.speak(tamilSummary, language: 'ta-IN');
+              await tts.speak(nativeSummary, language: userSarvamCode);
           }
 
           if (!mounted) return;
@@ -305,29 +309,31 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                              'Solution found in knowledge base.';
           final similarity = ((matchData['similarity'] as num?) ?? 0) * 100;
 
-          // Translate answer to Tamil using Sarvam
-          setState(() => _loadingMessage = 'Translating to Tamil...');
+          // Translate answer to user's native language using Sarvam
+          setState(() => _loadingMessage = 'Translating to your language...');
           final sarvam = ref.read(sarvamApiServiceProvider);
-          final tamilAnswer = await sarvam.translateText(
+          final userLangCode = ref.read(languageProvider) ?? 'en';
+          final userSarvamCode = toSarvamCode(userLangCode);
+          final nativeAnswer = await sarvam.translateText(
             answerText,
             sourceLanguage: 'en-IN',
-            targetLanguage: 'ta-IN',
+            targetLanguage: userSarvamCode,
           );
 
           setState(() {
             _isProcessing = false;
             _loadingMessage = null;
             _matchedAnswer = answerText;
-            _tamilAnswer = tamilAnswer;
+            _nativeAnswer = nativeAnswer;
             _matchSimilarity = similarity.toInt();
             _isAiAnswer = false;
           });
 
-          // Speak the Tamil answer via flutter_tts or Play Original Audio
+          // Speak the native answer or Play Original Audio
           final audioUrl = matchData['audio_url'] as String?;
           if (audioUrl != null && audioUrl.isNotEmpty) {
             debugPrint('Playing original audio for solution: $audioUrl');
-            await _audioPlayer.stop(); // Stop any previous
+            await _audioPlayer.stop();
             await _audioPlayer.play(UrlSource(audioUrl));
             setState(() {
               _matchedAudioUrl = audioUrl;
@@ -335,7 +341,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           } else {
              debugPrint('No original audio, using TTS.');
              final tts = ref.read(textToSpeechServiceProvider);
-             await tts.speak(tamilAnswer, language: 'ta-IN');
+             await tts.speak(nativeAnswer, language: userSarvamCode);
              setState(() {
                _matchedAudioUrl = null;
              });
@@ -369,26 +375,28 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           // Generate AI Answer using Gemini
           final aiAnswer = await geminiService.generateAnswer(queryText);
 
-          // Translate AI Answer to Tamil
+          // Translate AI Answer to user's native language
           final sarvam = ref.read(sarvamApiServiceProvider);
-          final tamilAiAnswer = await sarvam.translateText(
+          final userLangCode = ref.read(languageProvider) ?? 'en';
+          final userSarvamCode = toSarvamCode(userLangCode);
+          final nativeAiAnswer = await sarvam.translateText(
             aiAnswer,
             sourceLanguage: 'en-IN',
-            targetLanguage: 'ta-IN',
+            targetLanguage: userSarvamCode,
           );
 
           setState(() {
             _isProcessing = false;
             _loadingMessage = null;
             _matchedAnswer = aiAnswer;
-            _tamilAnswer = tamilAiAnswer;
+            _nativeAnswer = nativeAiAnswer;
             _isAiAnswer = true;
-            _matchSimilarity = 0; // AI answer, similarity not applicable
+            _matchSimilarity = 0;
           });
 
-          // Speak the AI answer in Tamil
+          // Speak the AI answer in user's native language
           final tts = ref.read(textToSpeechServiceProvider);
-          await tts.speak(tamilAiAnswer, language: 'ta-IN');
+          await tts.speak(nativeAiAnswer, language: userSarvamCode);
 
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -462,11 +470,11 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       _translation = null;
       _audioPath = null;
       _matchedAnswer = null;
-      _tamilAnswer = null;
+      _nativeAnswer = null;
       _matchSimilarity = 0;
       _isAiAnswer = false;
       _isProcessing = false;
-      _selectedImage = null; // Reset image
+      _selectedImage = null;
     });
   }
 
@@ -601,7 +609,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                       // Mic (Center)
                       VoiceRecorderWidget(
                         onResult: _handleVoiceResult,
-                        initialLocale: 'ta_IN',
+                        initialLocale: toSarvamCode(ref.read(languageProvider)),
                       ),
                       
                       const SizedBox(width: 24),
@@ -763,25 +771,26 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                     ],
                                   ),
 
-                                  // Tamil Answer (primary)
-                                  if (_tamilAnswer != null) ...[
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        const Text('🇮🇳', style: TextStyle(fontSize: 16)),
-                                        const SizedBox(width: 6),
-                                        Text('தமிழ் பதில்', 
-                                          style: AppTextStyles.labelMedium.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          )),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      _tamilAnswer!,
-                                      style: AppTextStyles.bodyLarge.copyWith(height: 1.6),
-                                    ),
-                                  ],
+                          // Native language Answer (primary)
+                          if (_nativeAnswer != null) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Text('🇮🇳', style: TextStyle(fontSize: 16)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _getLanguageLabel(),
+                                  style: AppTextStyles.labelMedium.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  )),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _nativeAnswer!,
+                              style: AppTextStyles.bodyLarge.copyWith(height: 1.6),
+                            ),
+                          ],
 
                                   // English Answer (secondary)
                                   if (!_isAiAnswer) ...[
@@ -813,12 +822,14 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
+                                        final userLangCode = ref.read(languageProvider) ?? 'en';
+                                        final userSarvamCode = toSarvamCode(userLangCode);
                                         if (_isAiAnswer) {
                                           final tts = ref.read(textToSpeechServiceProvider);
                                           if (_isTtsPlaying) {
                                             await tts.stop();
                                           } else {
-                                            tts.speak(_tamilAnswer ?? _matchedAnswer!, language: 'ta-IN');
+                                            tts.speak(_nativeAnswer ?? _matchedAnswer!, language: userSarvamCode);
                                           }
                                         } else {
                                           if (_matchedAudioUrl != null) {
@@ -827,7 +838,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                           } else {
                                             // Fallback for community answer without audio
                                             final tts = ref.read(textToSpeechServiceProvider);
-                                            tts.speak(_tamilAnswer ?? _matchedAnswer!, language: 'ta-IN');
+                                            tts.speak(_nativeAnswer ?? _matchedAnswer!, language: userSarvamCode);
                                           }
                                         }
                                       },
@@ -924,5 +935,15 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
         ),
       ),
     );
+  }
+
+  /// Returns a display label for the user's native language answer section.
+  String _getLanguageLabel() {
+    final langCode = ref.read(languageProvider) ?? 'en';
+    final lang = AppConstants.supportedLanguages.firstWhere(
+      (l) => l['code'] == langCode,
+      orElse: () => {'name': 'Answer', 'english': 'Answer'},
+    );
+    return '${lang['name']} Answer';
   }
 }

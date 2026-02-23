@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, Query, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
 from app.services.sarvam import speech_to_text, text_to_speech, translate_text
 import shutil
@@ -32,7 +32,7 @@ def is_tamil(text: str) -> bool:
     return False
 
 @router.post("/transcribe")
-async def transcribe_audio(file: UploadFile = File(...), language_code: str = "ta-IN"):
+async def transcribe_audio(file: UploadFile = File(...), language_code: str = Query(..., description="Sarvam language code, e.g. ta-IN, hi-IN, pa-IN")):
     """
     Accepts an audio file upload and returns the transcription from Sarvam AI.
     """
@@ -137,7 +137,7 @@ async def speak_text(request: SpeakRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/stream")
-async def stream_text(text: str, language_code: str = "ta-IN"):
+async def stream_text(text: str, language_code: str = Query(..., description="Sarvam language code, e.g. ta-IN, hi-IN, pa-IN")):
     """
     GET endpoint for instant streaming via audio players.
     """

@@ -84,7 +84,7 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
     if (filePath != null) {
       try {
         final userLangCode = ref.read(languageProvider) ?? 'en';
-        final sourceLang = '${userLangCode}-IN';
+        final sourceLang = toSarvamCode(userLangCode);
 
         final sarvamService = ref.read(sarvamApiServiceProvider);
         final response = await sarvamService.processAudio(filePath, sourceLanguage: sourceLang);
