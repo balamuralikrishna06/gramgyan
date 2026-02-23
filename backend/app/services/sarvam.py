@@ -25,7 +25,24 @@ def _should_fallback(status_code: int) -> bool:
     return status_code in (401, 403, 429)
 
 
+import os
+
 # ── Speech-to-Text ────────────────────────────────────────────────────────────
+
+def _get_audio_mime_type(file_path: str) -> str:
+    """Return correct MIME type based on file extension."""
+    ext = os.path.splitext(file_path)[1].lower()
+    mime_map = {
+        ".wav": "audio/wav",
+        ".wave": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".mp4": "audio/mp4",
+        ".ogg": "audio/ogg",
+        ".webm": "audio/webm",
+        ".flac": "audio/flac",
+    }
+    return mime_map.get(ext, "audio/wav")
 
 async def speech_to_text(audio_file_path: str, language_code: str = "ta-IN") -> str:
     """
@@ -39,7 +56,7 @@ async def speech_to_text(audio_file_path: str, language_code: str = "ta-IN") -> 
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 with open(audio_file_path, "rb") as f:
-                    files = {"file": (audio_file_path, f, "audio/wav")}
+                    files = {"file": (os.path.basename(audio_file_path), f, _get_audio_mime_type(audio_file_path))}
                     headers = {"api-subscription-key": key}
                     data = {"model": "saarika:v2.5", "language_code": language_code}
 
@@ -57,7 +74,9 @@ async def speech_to_text(audio_file_path: str, language_code: str = "ta-IN") -> 
 
                     response.raise_for_status()
                     result = response.json()
-                    return result.get("transcript", "")
+                    transcript = result.get("transcript", "")
+                    logger.info(f"STT [{language_code}] → '{transcript[:80]}...' (file: {os.path.basename(audio_file_path)})")
+                    return transcript
 
         except httpx.HTTPStatusError as e:
             if _should_fallback(e.response.status_code) and i < len(keys) - 1:
