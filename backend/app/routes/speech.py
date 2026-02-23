@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Form, Query, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
-from app.services.sarvam import speech_to_text, text_to_speech, translate_text
+from app.services.sarvam import speech_to_text, text_to_speech, translate_text, transliterate_to_native_script, _is_tanglish
 import shutil
 import os
 import uuid
@@ -85,8 +85,16 @@ async def process_audio(
             shutil.copyfileobj(file.file, buffer)
         
         # 1. STT
-        # We perform STT (defaulting to ta-IN as it often handles mixed speech well)
         transcript = await speech_to_text(temp_filename, source_language)
+
+        # 1b. Tanglish guard — if STT returned Latin text for a non-English language,
+        #     convert it to native Indic script using Sarvam /transliterate
+        if _is_tanglish(transcript, source_language):
+            import logging
+            logging.getLogger(__name__).info(
+                f"Tanglish detected in STT output for {source_language}. Transliterating to native script."
+            )
+            transcript = await transliterate_to_native_script(transcript, source_language)
         
         # 2. Language Detection & Translation
         detected_source_lang = source_language
@@ -96,11 +104,9 @@ async def process_audio(
              translation = ""
         else:
              if detected_source_lang == "en-IN":
-                 # User Requirement: "if it is english no need for translation"
-                 # We set translation same as transcript so the UI shows it clearly in the "Translation" box too.
                  translation = transcript 
              else:
-                 # Translate to the target language (default en-IN)
+                 # Translate native transcript -> English (pivot language)
                  translation = await translate_text(transcript, detected_source_lang, detected_target_lang)
 
         return ProcessResponse(

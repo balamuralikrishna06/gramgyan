@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 SARVAM_STT_URL = "https://api.sarvam.ai/speech-to-text"
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
 SARVAM_TRANSLATE_URL = "https://api.sarvam.ai/translate"
+SARVAM_TRANSLITERATE_URL = "https://api.sarvam.ai/transliterate"
 
 # ── Key Rotation ──────────────────────────────────────────────────────────────
 
@@ -26,6 +27,55 @@ def _should_fallback(status_code: int) -> bool:
 
 
 import os
+import re
+
+# ── Tanglish Detection ────────────────────────────────────────────────────────
+
+def _is_tanglish(text: str, language_code: str) -> bool:
+    """Returns True if the text is in Latin script but the expected language is non-English."""
+    if language_code == "en-IN":
+        return False  # English is expected to be Latin
+    if not text or not text.strip():
+        return False
+    # If >80% of non-space characters are ASCII/Latin, it's likely Tanglish
+    stripped = text.replace(" ", "")
+    latin_chars = sum(1 for c in stripped if ord(c) < 128)
+    return (latin_chars / len(stripped)) > 0.80 if stripped else False
+
+async def transliterate_to_native_script(text: str, language_code: str) -> str:
+    """
+    Converts a Tanglish/romanized string to native Indic script using Sarvam /transliterate.
+    e.g. 'Vanakkam' -> 'வணக்கம்' for ta-IN
+    """
+    keys = _get_api_keys()
+    for key in keys:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                payload = {
+                    "input": text,
+                    "source_language_code": "en-IN",   # Tanglish is treated as English input
+                    "target_language_code": language_code,
+                    "speaker_gender": "Male",
+                    "mode": "classic-colloquial",
+                    "numerals_format": "international",
+                    "output_script": "fully-native",
+                }
+                headers = {
+                    "api-subscription-key": key,
+                    "Content-Type": "application/json",
+                }
+                response = await client.post(SARVAM_TRANSLITERATE_URL, json=payload, headers=headers)
+                if response.status_code == 200:
+                    result = response.json()
+                    native = result.get("transliterated_text", text)
+                    logger.info(f"Transliterated '{text[:50]}' -> '{native[:50]}' [{language_code}]")
+                    return native
+                else:
+                    logger.warning(f"Transliterate failed ({response.status_code}): {response.text[:200]}")
+        except Exception as e:
+            logger.warning(f"Transliterate exception: {e}")
+    return text  # fallback: return original if transliteration fails
+
 
 # ── Speech-to-Text ────────────────────────────────────────────────────────────
 
