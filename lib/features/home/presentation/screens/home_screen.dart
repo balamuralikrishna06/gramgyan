@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../discussion/providers/discussion_providers.dart';
 import '../../../discussion/widgets/question_card.dart';
+import '../../domain/models/knowledge_post.dart';
 import '../providers/knowledge_providers.dart';
 import '../providers/notification_providers.dart';
 import '../../../../shared/widgets/knowledge_card.dart';
@@ -21,6 +22,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final postsAsync = ref.watch(knowledgePostsProvider);
     final questionsAsync = ref.watch(questionsProvider);
     final filter = ref.watch(selectedCategoryProvider);
     final unreadCountAsync = ref.watch(unreadNotificationsCountProvider);

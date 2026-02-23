@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../data/repositories/notification_repository.dart';
-import '../domain/models/app_notification.dart';
+import '../../data/repositories/notification_repository.dart';
+import '../../domain/models/app_notification.dart';
 
 final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
   return NotificationRepository(Supabase.instance.client);
