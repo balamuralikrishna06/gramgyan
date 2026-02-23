@@ -205,10 +205,40 @@ async def translate_text(
 
 # ── Text-to-Speech ────────────────────────────────────────────────────────────
 
+def _clean_for_tts(text: str, max_chars: int = 490) -> str:
+    """
+    Strip markdown and truncate text so Sarvam TTS (500-char limit) doesn't fail.
+    Keeps the first few meaningful sentences.
+    """
+    # Remove markdown bold/italic: **text** -> text, *text* -> text
+    text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', text)
+    # Remove markdown headers: ## Header -> Header
+    text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+    # Remove bullet/numbered list markers: "1. ", "- ", "* "
+    text = re.sub(r'^[\*\-\d]+\.?\s+', '', text, flags=re.MULTILINE)
+    # Remove extra whitespace / newlines
+    text = re.sub(r'\n+', ' ', text).strip()
+    text = re.sub(r'\s{2,}', ' ', text)
+    # Truncate to first N chars at a sentence boundary
+    if len(text) > max_chars:
+        truncated = text[:max_chars]
+        # Try to end at last sentence boundary
+        last_stop = max(truncated.rfind('.'), truncated.rfind('!'), truncated.rfind('?'))
+        if last_stop > max_chars // 2:
+            truncated = truncated[:last_stop + 1]
+        text = truncated
+    return text
+
 async def text_to_speech(text: str, language_code: str = "ta-IN") -> bytes:
     """
     Converts text to speech using Sarvam AI with automatic key fallback.
+    Strips markdown and truncates to 500 chars before sending (Sarvam TTS limit).
     """
+    # Clean text before sending to Sarvam TTS
+    text = _clean_for_tts(text)
+    if not text.strip():
+        raise ValueError("Empty text after cleaning")
+    logger.info(f"TTS [{language_code}] speaking: '{text[:80]}...'" if len(text) > 80 else f"TTS [{language_code}] speaking: '{text}'")
     keys = _get_api_keys()
     last_error = None
 
