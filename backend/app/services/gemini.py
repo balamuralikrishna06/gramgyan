@@ -60,8 +60,8 @@ class GeminiService:
         
         raise Exception(f"Gemini Rate Limit Exceeded after {max_retries} retries (Keys rotated).")
 
-    async def generate_answer(self, query: str) -> str:
-        prompt = f'Provide a clear, simple agricultural solution for this farmer question: "{query}". Keep the answer concise and easy to understand for a farmer. The answer MUST be in Tamil language.'
+    async def generate_answer(self, query: str, language: str = "English") -> str:
+        prompt = f'Provide a clear, simple agricultural solution for this farmer question: "{query}". Keep the answer concise and easy to understand for a farmer. The answer MUST be in {language} language.'
         try:
             return await self._generate_with_retry(prompt)
         except Exception as e:

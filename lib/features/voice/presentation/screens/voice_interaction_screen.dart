@@ -20,6 +20,7 @@ import '../../../../core/providers/language_provider.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
 import '../widgets/voice_recorder_widget.dart';
+import '../../../../core/services/gemini_service.dart';
 
 enum VoiceMode { ask, share }
 
@@ -379,34 +380,26 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
             }
           }
 
-          // Generate AI Answer using Gemini
-          final aiAnswer = await geminiService.generateAnswer(queryText);
-
-          // Translate AI Answer to user's native language
-          final sarvam = ref.read(sarvamApiServiceProvider);
+          // Generate AI Answer using Gemini in the user's language directly
           final userLangCode = _getUserLangCode();
           final userSarvamCode = toSarvamCode(userLangCode);
-          final nativeAiAnswer = userSarvamCode == 'en-IN'
-            ? aiAnswer
-            : await sarvam.translateText(
-                aiAnswer,
-                sourceLanguage: 'en-IN',
-                targetLanguage: userSarvamCode,
-              );
+          final userLangName = GeminiService.langCodeToName(userLangCode);
+          final aiAnswer = await geminiService.generateAnswer(queryText, language: userLangName);
 
+          // Gemini already responded in the user's language — no translation needed
           // Show answer + start TTS simultaneously
           final tts = ref.read(textToSpeechServiceProvider);
           setState(() {
             _isProcessing = false;
             _loadingMessage = null;
             _matchedAnswer = aiAnswer;
-            _nativeAnswer = nativeAiAnswer;
+            _nativeAnswer = aiAnswer;
             _answerLangCode = userLangCode;
             _isAiAnswer = true;
             _matchSimilarity = 0;
           });
           // Fire TTS immediately — audio loads while user reads the answer
-          unawaited(tts.speak(nativeAiAnswer, language: userSarvamCode));
+          unawaited(tts.speak(aiAnswer, language: userSarvamCode));
 
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(

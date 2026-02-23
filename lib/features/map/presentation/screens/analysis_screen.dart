@@ -9,6 +9,8 @@ import '../../../auth/domain/models/auth_state.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../map/presentation/providers/map_providers.dart';
 import '../../../../core/providers/service_providers.dart';
+import '../../../../core/providers/language_provider.dart';
+import '../../../../core/services/gemini_service.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -96,10 +98,13 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
         longitude: 0,
       );
 
-      // 2. Generate AI Answer
-      final aiResponse = await gemini.generateAnswer(widget.translatedText ?? widget.originalText);
-      // Translate back if needed (Assuming Tamil for now as MVP default or user pref)
-      // For now, we show English AI response or simple translation logic
+      // 2. Generate AI Answer in user's language directly
+      final userLangCode = ref.read(languageProvider);
+      final userLangName = GeminiService.langCodeToName(userLangCode);
+      final aiResponse = await gemini.generateAnswer(
+        widget.translatedText ?? widget.originalText,
+        language: userLangName,
+      );
       
       if (mounted) {
         setState(() {

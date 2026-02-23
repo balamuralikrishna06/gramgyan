@@ -7,6 +7,7 @@ router = APIRouter()
 
 class AnswerRequest(BaseModel):
     query: str
+    language: str = "English"
 
 class SafetyRequest(BaseModel):
     text: str
@@ -24,7 +25,7 @@ async def generate_answer(request: AnswerRequest):
     Generate an agricultural answer in Tamil using Gemini.
     """
     try:
-        answer = await gemini_service.generate_answer(request.query)
+        answer = await gemini_service.generate_answer(request.query, language=request.language)
         return {"answer": answer}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

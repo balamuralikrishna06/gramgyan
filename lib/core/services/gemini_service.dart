@@ -14,25 +14,44 @@ class GeminiService {
     debugPrint('GeminiService initialized to hit remote backend $_baseUrl');
   }
 
+  /// Returns the full display name of a language for use in AI prompts.
+  static String langCodeToName(String? code) {
+    switch (code) {
+      case 'ta': return 'Tamil';
+      case 'hi': return 'Hindi';
+      case 'pa': return 'Punjabi';
+      case 'te': return 'Telugu';
+      case 'bn': return 'Bengali';
+      case 'mr': return 'Marathi';
+      case 'gu': return 'Gujarati';
+      case 'kn': return 'Kannada';
+      case 'ml': return 'Malayalam';
+      case 'or': return 'Odia';
+      case 'en':
+      default:   return 'English';
+    }
+  }
+
   /// Generates a clear agricultural solution for a farmer question.
-  Future<String> generateAnswer(String query) async {
+  /// [language] should be a display name like "English" or "Tamil".
+  Future<String> generateAnswer(String query, {String language = 'English'}) async {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/answer'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'query': query}),
+        body: jsonEncode({'query': query, 'language': language}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        return data['answer'] ?? 'தற்போது என்னால் பதில் அளிக்க முடியவில்லை.';
+        return data['answer'] ?? 'Sorry, I could not generate an answer right now.';
       } else {
         debugPrint('Gemini Answer Error: ${response.statusCode} - ${response.body}');
-        return 'தற்போது என்னால் பதில் அளிக்க முடியவில்லை. தயவுசெய்து சிறிது நேரம் கழித்து முயற்சிக்கவும்.';
+        return 'Sorry, I could not generate an answer. Please try again later.';
       }
     } catch (e) {
       debugPrint('Gemini Network Error: $e');
-      return 'தற்போது என்னால் பதில் அளிக்க முடியவில்லை. பிணையப் பிழை.';
+      return 'Sorry, I could not generate an answer. Network error.';
     }
   }
 

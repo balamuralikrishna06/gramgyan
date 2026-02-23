@@ -9,6 +9,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/services/gemini_service.dart';
+import '../../../../core/providers/language_provider.dart';
 
 // Providers
 final chatHistoryProvider = StateProvider.autoDispose<List<ChatMessage>>((ref) => []);
@@ -129,7 +130,9 @@ class _ChatInteractionScreenState extends ConsumerState<ChatInteractionScreen> {
         }
       } else {
         // Text-only Query
-        responseText = await geminiService.generateAnswer(text);
+        final userLangCode = ref.read(languageProvider);
+        final userLangName = GeminiService.langCodeToName(userLangCode);
+        responseText = await geminiService.generateAnswer(text, language: userLangName);
       }
 
       // 2. Add AI Response
@@ -137,7 +140,7 @@ class _ChatInteractionScreenState extends ConsumerState<ChatInteractionScreen> {
        ref.read(chatHistoryProvider.notifier).update((state) => [...state, aiMsg]);
 
     } catch (e) {
-      final errorMsg = ChatMessage(text: "மன்னிக்கவும், ஒரு பிழை ஏற்பட்டது: $e", isUser: false);
+      final errorMsg = ChatMessage(text: "Sorry, an error occurred: $e", isUser: false);
       ref.read(chatHistoryProvider.notifier).update((state) => [...state, errorMsg]);
     } finally {
       ref.read(isChatProcessingProvider.notifier).state = false;
