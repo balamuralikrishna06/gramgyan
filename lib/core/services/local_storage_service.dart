@@ -1,3 +1,4 @@
+import 'dart:ui' show PlatformDispatcher;
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../constants/app_constants.dart';
@@ -13,8 +14,15 @@ class LocalStorageService {
   }
 
   // ── Language ──
+  /// Returns the stored language code, or falls back to the device locale language.
+  /// e.g. if the device locale is 'ta_IN', returns 'ta'.
   static String? getLanguage() {
-    return _settingsBox.get(AppConstants.languageKey) as String?;
+    final stored = _settingsBox.get(AppConstants.languageKey) as String?;
+    if (stored != null) return stored;
+    // Fall back to device locale — strip region: 'ta_IN' → 'ta'
+    final localeLang = PlatformDispatcher.instance.locale.languageCode;
+    const supported = {'ta','hi','pa','te','bn','mr','gu','kn','ml','or','en'};
+    return supported.contains(localeLang) ? localeLang : 'ta'; // default ta for Indian farmers
   }
 
   static Future<void> setLanguage(String languageCode) async {
