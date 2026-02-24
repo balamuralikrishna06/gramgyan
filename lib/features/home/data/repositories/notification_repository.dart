@@ -7,11 +7,13 @@ class NotificationRepository {
 
   NotificationRepository(this._client);
 
-  Future<List<AppNotification>> getNotifications() async {
+  Future<List<AppNotification>> getNotifications(String userId) async {
+    if (userId.isEmpty) return [];
     try {
       final response = await _client
           .from('notifications')
           .select()
+          .eq('user_id', userId)
           .order('created_at', ascending: false);
 
       final List<dynamic> data = response as List<dynamic>;
@@ -33,11 +35,13 @@ class NotificationRepository {
     }
   }
 
-  Future<int> getUnreadCount() async {
+  Future<int> getUnreadCount(String userId) async {
+     if (userId.isEmpty) return 0;
      try {
        final response = await _client
            .from('notifications')
            .select('id')
+           .eq('user_id', userId)
            .eq('is_read', false)
            .count(CountOption.exact);
        return response.count ?? 0;
@@ -47,3 +51,4 @@ class NotificationRepository {
      }
   }
 }
+
