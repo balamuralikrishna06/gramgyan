@@ -47,9 +47,6 @@ class AppConstants {
     'Questions',
     'Solved',
     'Verified',
-    'Crops',
-    'Livestock',
-    'Weather',
   ];
 
   // ── Supported Languages ──

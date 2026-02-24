@@ -40,6 +40,16 @@ final farmerProfileProvider = FutureProvider<FarmerProfile>((ref) async {
   // Try to fetch from Backend
   final data = await repo.fetchUserProfile();
 
+  int calculatedKarma = data != null ? (data['karma'] as int? ?? 0) : 0;
+  int totalPosts = data != null ? (data['total_posts'] as int? ?? 0) : 0;
+  int solutionsVerified = data != null ? (data['solutions_verified'] as int? ?? 0) : 0;
+  List<String> badges = [];
+
+  // Basic badge logic based on the user table fields
+  if (solutionsVerified >= 1) badges.add('first_solution');
+  if (solutionsVerified >= 5) badges.add('top_contributor');
+  if (totalPosts >= 10) badges.add('active_farmer');
+
   if (data != null) {
     return FarmerProfile(
       id: user.uid,
@@ -48,12 +58,12 @@ final farmerProfileProvider = FutureProvider<FarmerProfile>((ref) async {
           'Farmer',
       city: data['city'] as String? ?? '',
       state: data['state'] as String? ?? '',
-      karma: data['karma'] as int? ?? 0,
-      totalPosts: 0,
-      solutionsVerified: 0,
+      karma: calculatedKarma,
+      totalPosts: totalPosts,
+      solutionsVerified: solutionsVerified,
       language: data['language'] as String? ?? '',
       avatarUrl: user.photoURL ?? '',
-      badges: const [],
+      badges: badges,
     );
   }
 
@@ -65,8 +75,8 @@ final farmerProfileProvider = FutureProvider<FarmerProfile>((ref) async {
         'Farmer',
     city: '',
     state: '',
-    karma: 0,
-    totalPosts: 0,
+    karma: calculatedKarma,
+    totalPosts: totalPosts,
     language: '',
     avatarUrl: user.photoURL ?? '',
   );

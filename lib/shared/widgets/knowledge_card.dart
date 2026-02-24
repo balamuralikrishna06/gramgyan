@@ -203,40 +203,6 @@ class _KnowledgeCardState extends ConsumerState<KnowledgeCard> {
                   },
                 ),
 
-                const SizedBox(width: 8),
-
-                // Reply count pill
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.cardGreenDark
-                        : AppColors.cardGreenLight,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.chat_bubble_outline_rounded,
-                          size: 14,
-                          color: isDark
-                              ? AppColors.primaryLight
-                              : AppColors.primary),
-                      const SizedBox(width: 4),
-                      Text(
-                        '3 Replies',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: isDark
-                              ? AppColors.primaryLight
-                              : AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
                 const Spacer(),
 
                 // Karma / Upvote or Answer CTA

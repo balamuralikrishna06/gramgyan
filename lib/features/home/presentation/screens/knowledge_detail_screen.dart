@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,9 @@ import 'package:audioplayers/audioplayers.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/providers/service_providers.dart';
+import '../../../../core/providers/language_provider.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../domain/models/knowledge_post.dart';
 import '../providers/knowledge_providers.dart';
 
@@ -20,7 +24,15 @@ class KnowledgeDetailScreen extends ConsumerStatefulWidget {
 
 class _KnowledgeDetailScreenState extends ConsumerState<KnowledgeDetailScreen> {
   late AudioPlayer _audioPlayer;
+  StreamSubscription<PlayerState>? _audioSubscription;
   bool _isPlaying = false;
+  
+  StreamSubscription<PlayerState>? _ttsSubscription;
+  bool _isTtsPlaying = false;
+  
+  bool _isTranslating = false;
+  String? _translatedText;
+
   bool _isLoading = true;
   KnowledgePost? _post;
 
@@ -28,12 +40,14 @@ class _KnowledgeDetailScreenState extends ConsumerState<KnowledgeDetailScreen> {
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = state == PlayerState.playing;
-        });
-      }
+    
+    Future.microtask(() {
+      _ttsSubscription = ref.read(textToSpeechServiceProvider).onPlayerStateChanged.listen((state) {
+        if (mounted) setState(() => _isTtsPlaying = state == PlayerState.playing);
+      });
+      _audioSubscription = _audioPlayer.onPlayerStateChanged.listen((state) {
+        if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
+      });
     });
     
     _loadPost();
@@ -52,8 +66,19 @@ class _KnowledgeDetailScreenState extends ConsumerState<KnowledgeDetailScreen> {
 
   @override
   void dispose() {
+    _ttsSubscription?.cancel();
+    _audioSubscription?.cancel();
     _audioPlayer.dispose();
     super.dispose();
+  }
+
+  String _getLanguageLabel() {
+    final langCode = ref.read(languageProvider) ?? 'en';
+    final lang = AppConstants.supportedLanguages.firstWhere(
+      (l) => l['code'] == langCode,
+      orElse: () => {'english': 'Audio'},
+    );
+    return '${lang['english']}';
   }
 
   @override
@@ -251,50 +276,92 @@ class _KnowledgeDetailScreenState extends ConsumerState<KnowledgeDetailScreen> {
               // Actions (Play Audio / Upvote)
               Row(
                 children: [
-                  // Play button
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () async {
-                        if (_isPlaying) {
-                          await _audioPlayer.pause();
-                        } else {
-                          if (post.audioUrl.isNotEmpty) {
-                            try {
-                              await _audioPlayer.play(UrlSource(post.audioUrl));
-                            } catch (e) {
-                              debugPrint('Audio play error: $e');
-                            }
+                  // Audio Action Buttons
+                  if (post.audioUrl.isNotEmpty) ...[
+                    // Two Buttons (Original Audio & TTS)
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          if (_isPlaying) {
+                            await _audioPlayer.stop();
+                          } else {
+                            await ref.read(textToSpeechServiceProvider).stop();
+                            await _audioPlayer.play(UrlSource(post.audioUrl));
                           }
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: _isPlaying ? AppColors.accent.withValues(alpha: 0.1) : AppColors.primary,
-                          borderRadius: BorderRadius.circular(16),
-                          border: _isPlaying ? Border.all(color: AppColors.accent) : null,
+                        },
+                        icon: Icon(_isPlaying ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded, size: 20),
+                        label: Text(
+                          _isPlaying ? 'Stop' : 'Original',
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                              size: 24,
-                              color: _isPlaying ? AppColors.accent : Colors.white,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _isPlaying ? 'Pause Audio' : 'Play Audio',
-                              style: AppTextStyles.titleSmall.copyWith(
-                                color: _isPlaying ? AppColors.accent : Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDark ? AppColors.surfaceDark : Colors.grey[800],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 0,
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                  ],
+                  
+                  // TTS Button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final userLangCode = ref.read(languageProvider) ?? 'en';
+                        final userSarvamCode = toSarvamCode(userLangCode);
+                        final tts = ref.read(textToSpeechServiceProvider);
+                        if (_isTtsPlaying) {
+                          await tts.stop();
+                        } else if (!_isTranslating) {
+                          await _audioPlayer.stop();
+                          if (_translatedText == null && userSarvamCode != 'en-IN') {
+                            setState(() => _isTranslating = true);
+                            try {
+                              final sarvam = ref.read(sarvamApiServiceProvider);
+                              final sourceText = (post.englishText != null && post.englishText!.isNotEmpty)
+                                  ? post.englishText!
+                                  : post.transcript;
+                              _translatedText = await sarvam.translateText(
+                                sourceText,
+                                sourceLanguage: 'en-IN',
+                                targetLanguage: userSarvamCode,
+                              );
+                            } catch (e) {
+                              debugPrint('Translation error: $e');
+                              _translatedText = post.transcript;
+                            } finally {
+                              if (mounted) setState(() => _isTranslating = false);
+                            }
+                          }
+                          
+                          final fallbackText = (post.englishText != null && post.englishText!.isNotEmpty)
+                              ? post.englishText!
+                              : post.transcript;
+                          final textToSpeak = _translatedText ?? (userSarvamCode == 'en-IN' ? fallbackText : post.transcript);
+                          
+                          tts.speak(textToSpeak, language: userSarvamCode);
+                        }
+                      },
+                      icon: _isTranslating 
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Icon(_isTtsPlaying ? Icons.stop_circle_rounded : Icons.volume_up_rounded, size: 20),
+                      label: Text(
+                        _isTranslating ? '...' : (_isTtsPlaying ? 'Stop' : _getLanguageLabel()),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDark ? AppColors.cardGreenDark : AppColors.cardGreenLight,
+                        foregroundColor: isDark ? AppColors.primaryLight : AppColors.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 0,
+                      ),
+                    ),
                   ),
+                  if (post.audioUrl.isEmpty) const Spacer(),
                   const SizedBox(width: 12),
                   // Upvote button
                   GestureDetector(

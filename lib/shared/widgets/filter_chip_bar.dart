@@ -33,7 +33,7 @@ class FilterChipBar extends ConsumerWidget {
             onTap: () {
               ref.read(selectedCategoryProvider.notifier).state = filter;
               // Sync discussion status if applicable
-              if (['Questions', 'Solved', 'Verified'].contains(filter)) {
+              if (['All', 'Questions', 'Solved', 'Verified'].contains(filter)) {
                  ref.read(selectedQuestionStatusProvider.notifier).state = filter;
               }
             },

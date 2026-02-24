@@ -47,6 +47,7 @@ class Question {
   final String crop;
   final String category;
   final String transcript;
+  final String? englishText;
   final String audioUrl;
   final QuestionStatus status;
   final int replyCount;
@@ -61,6 +62,7 @@ class Question {
     required this.crop,
     required this.category,
     required this.transcript,
+    this.englishText,
     required this.audioUrl,
     required this.status,
     required this.replyCount,
@@ -76,6 +78,7 @@ class Question {
     String? crop,
     String? category,
     String? transcript,
+    String? englishText,
     String? audioUrl,
     QuestionStatus? status,
     int? replyCount,
@@ -90,6 +93,7 @@ class Question {
       crop: crop ?? this.crop,
       category: category ?? this.category,
       transcript: transcript ?? this.transcript,
+      englishText: englishText ?? this.englishText,
       audioUrl: audioUrl ?? this.audioUrl,
       status: status ?? this.status,
       replyCount: replyCount ?? this.replyCount,
@@ -99,6 +103,12 @@ class Question {
   }
 
   factory Question.fromJson(Map<String, dynamic> json) {
+    final parsedReplyCount = json['reply_count'] as int? ?? json['replyCount'] as int? ?? 0;
+    var parsedStatus = QuestionStatus.fromString(json['status'] as String? ?? 'open');
+    if (parsedStatus == QuestionStatus.open && parsedReplyCount > 0) {
+      parsedStatus = QuestionStatus.solved;
+    }
+
     return Question(
       id: json['id'] as String,
       authorId: json['user_id'] as String? ?? json['authorId'] as String? ?? 'unknown',
@@ -107,9 +117,10 @@ class Question {
       crop: json['crop'] as String? ?? 'General',
       category: json['category'] as String? ?? 'Crops',
       transcript: json['original_text'] as String? ?? json['transcript'] as String? ?? '',
+      englishText: json['english_text'] as String?,
       audioUrl: json['audio_url'] as String? ?? json['audioUrl'] as String? ?? '',
-      status: QuestionStatus.fromString(json['status'] as String? ?? 'open'),
-      replyCount: json['reply_count'] as int? ?? json['replyCount'] as int? ?? 0,
+      status: parsedStatus,
+      replyCount: parsedReplyCount,
       karma: json['karma'] as int? ?? 0,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
@@ -128,6 +139,7 @@ class Question {
       'crop': crop,
       'category': category,
       'original_text': transcript,
+      'english_text': englishText,
       'audio_url': audioUrl,
       'status': status.name,
       'reply_count': replyCount,

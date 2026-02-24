@@ -5,6 +5,7 @@ class KnowledgePost {
   final String location;
   final String crop;
   final String transcript;
+  final String? englishText;
   final String audioUrl;
   final int karma;
   final bool verified;
@@ -19,6 +20,7 @@ class KnowledgePost {
     required this.location,
     required this.crop,
     required this.transcript,
+    this.englishText,
     required this.audioUrl,
     required this.karma,
     required this.verified,
@@ -35,6 +37,7 @@ class KnowledgePost {
     String? location,
     String? crop,
     String? transcript,
+    String? englishText,
     String? audioUrl,
     int? karma,
     bool? verified,
@@ -49,6 +52,7 @@ class KnowledgePost {
       location: location ?? this.location,
       crop: crop ?? this.crop,
       transcript: transcript ?? this.transcript,
+      englishText: englishText ?? this.englishText,
       audioUrl: audioUrl ?? this.audioUrl,
       karma: karma ?? this.karma,
       verified: verified ?? this.verified,
@@ -67,8 +71,9 @@ class KnowledgePost {
       location: (json['location'] ?? 'Unknown Location') as String,
       crop: (json['crop'] ?? 'Other') as String,
       transcript: (json['original_text'] ?? json['transcript'] ?? '') as String,
+      englishText: json['english_text'] as String?,
       audioUrl: (json['audio_url'] ?? json['audioUrl'] ?? '') as String,
-      karma: (json['karma'] as num?)?.toInt() ?? 0,
+      karma: (json['likes_count'] ?? json['karma'] as num?)?.toInt() ?? 0,
       verified: (json['is_verified'] ?? json['verified'] ?? false) as bool,
       latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
@@ -88,8 +93,9 @@ class KnowledgePost {
       'location': location,
       'crop': crop,
       'transcript': transcript,
+      'english_text': englishText,
       'audioUrl': audioUrl,
-      'karma': karma,
+      'likes_count': karma,
       'verified': verified,
       'latitude': latitude,
       'longitude': longitude,

@@ -29,7 +29,7 @@ class SupabaseKnowledgeRepository {
 
   /// Fetch posts filtered by category.
   Future<List<KnowledgePost>> fetchPostsByCategory(String category) async {
-    if (category == 'All') {
+    if (category == 'All' || category == 'Verified') {
       return fetchPosts();
     }
 
@@ -79,14 +79,14 @@ class SupabaseKnowledgeRepository {
       try {
         final current = await _client
             .from('knowledge_posts')
-            .select('karma')
+            .select('likes_count')
             .eq('id', postId)
             .single();
             
-        final currentKarma = current['karma'] as int? ?? 0;
+        final currentKarma = current['likes_count'] as int? ?? 0;
         await _client
             .from('knowledge_posts')
-            .update({'karma': currentKarma + 1})
+            .update({'likes_count': currentKarma + 1})
             .eq('id', postId);
       } catch (e2) {
         debugPrint('Direct upvote also failed: $e2');
