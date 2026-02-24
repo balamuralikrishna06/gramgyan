@@ -41,43 +41,14 @@ final farmerProfileProvider = FutureProvider<FarmerProfile>((ref) async {
   final data = await repo.fetchUserProfile();
 
   int calculatedKarma = data != null ? (data['karma'] as int? ?? 0) : 0;
-  int totalPosts = 0;
-  int solutionsVerified = 0;
+  int totalPosts = data != null ? (data['total_posts'] as int? ?? 0) : 0;
+  int solutionsVerified = data != null ? (data['solutions_verified'] as int? ?? 0) : 0;
   List<String> badges = [];
 
-  try {
-    final client = Supabase.instance.client;
-
-    // 1. Get Questions count and karma
-    final questions = await client.from('questions').select('karma').eq('user_id', user.uid);
-    totalPosts += (questions as List).length;
-    for (var q in questions) {
-      calculatedKarma += (q['karma'] as int? ?? 0);
-    }
-
-    // 2. Get Knowledge Posts count and likes
-    final kPosts = await client.from('knowledge_posts').select('likes_count').eq('user_id', user.uid);
-    totalPosts += (kPosts as List).length;
-    for (var k in kPosts) {
-      calculatedKarma += (k['likes_count'] as int? ?? 0);
-    }
-
-    // 3. Get Answers for verified solutions and karma
-    final answers = await client.from('answers').select('karma, is_verified').eq('user_id', user.uid);
-    for (var a in answers) {
-      calculatedKarma += (a['karma'] as int? ?? 0);
-      if (a['is_verified'] == true) {
-        solutionsVerified++;
-      }
-    }
-
-    // Basic badge logic
-    if (solutionsVerified >= 1) badges.add('first_solution');
-    if (solutionsVerified >= 5) badges.add('top_contributor');
-    if (totalPosts >= 10) badges.add('active_farmer');
-  } catch (e) {
-    // Silently continue if stats fail to load
-  }
+  // Basic badge logic based on the user table fields
+  if (solutionsVerified >= 1) badges.add('first_solution');
+  if (solutionsVerified >= 5) badges.add('top_contributor');
+  if (totalPosts >= 10) badges.add('active_farmer');
 
   if (data != null) {
     return FarmerProfile(
