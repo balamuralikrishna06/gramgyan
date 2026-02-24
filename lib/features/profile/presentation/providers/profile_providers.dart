@@ -83,12 +83,18 @@ class ProfileController {
   Future<void> updateLanguage(String newLanguage) async {
     final user = _ref.read(authRepositoryProvider).currentUser;
     if (user == null) return;
+    
+    // Get existing profile data to preserve it during update
+    final currentProfile = _ref.read(farmerProfileProvider).valueOrNull;
 
     try {
-      await Supabase.instance.client
-          .from('users')
-          .update({'language': newLanguage})
-          .eq('id', user.uid);
+      await _ref.read(authRepositoryProvider).updateProfile(
+        name: currentProfile?.name ?? user.displayName ?? 'Farmer',
+        state: currentProfile?.state ?? '',
+        city: currentProfile?.city ?? '',
+        language: newLanguage,
+        role: 'farmer',
+      );
       
       // Invalidate the profile provider to reflect changes
       _ref.invalidate(farmerProfileProvider);
