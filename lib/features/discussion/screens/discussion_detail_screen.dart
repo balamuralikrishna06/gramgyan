@@ -506,8 +506,11 @@ class _QuestionCardState extends ConsumerState<_QuestionCard> {
                         setState(() => _isTranslating = true);
                         try {
                           final sarvam = ref.read(sarvamApiServiceProvider);
+                          final sourceText = (widget.question.englishText != null && widget.question.englishText!.isNotEmpty)
+                              ? widget.question.englishText!
+                              : widget.question.transcript;
                           _translatedText = await sarvam.translateText(
-                            widget.question.transcript,
+                            sourceText,
                             sourceLanguage: 'en-IN',
                             targetLanguage: userSarvamCode,
                           );
@@ -518,7 +521,13 @@ class _QuestionCardState extends ConsumerState<_QuestionCard> {
                           if (mounted) setState(() => _isTranslating = false);
                         }
                       }
-                      tts.speak(_translatedText ?? widget.question.transcript, language: userSarvamCode);
+                      
+                      final fallbackText = (widget.question.englishText != null && widget.question.englishText!.isNotEmpty)
+                          ? widget.question.englishText!
+                          : widget.question.transcript;
+                      final textToSpeak = _translatedText ?? (userSarvamCode == 'en-IN' ? fallbackText : widget.question.transcript);
+                      
+                      tts.speak(textToSpeak, language: userSarvamCode);
                     }
                   },
                   icon: _isTranslating 
