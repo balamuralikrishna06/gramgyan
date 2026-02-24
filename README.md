@@ -1,4 +1,4 @@
-*Gram Gyan*
+
 Gram Gyan is an AI-powered, audio-first knowledge transfer system designed to bridge the information gap for Indian farmers. By combining Google Gemini with a community-driven validation loop, the app ensures farmers receive instant, accessible, and verified agricultural advice.
 
 🚀 Key Features
