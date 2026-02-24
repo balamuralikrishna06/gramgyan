@@ -1,17 +1,2 @@
-# GramGyan
-
-Farmer- Farmer Knowledge Transfer Ai
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Gram Gyan
+Gram Gyan is an AI-powered, audio-first knowledge transfer system designed to bridge the information gap for Indian farmers. By combining Google Gemini with a community-driven validation loop, the app ensures farmers receive instant, accessible, and verified agricultural advice.🚀 Key Features🎙️ Audio-First UI: Farmers record queries in their local language—no typing required.🤖 AI Fallback: Uses Gemini 1.5 Flash to provide instant "AI-labeled" answers if no database match exists.🤝 Community Knowledge: Questions are posted to a community feed where experts and peers can provide verified solutions.🛡️ Admin Moderation: All human answers require admin approval before the user is notified, preventing misinformation.📊 Statistical Reporting: Generates automated HTML reports on regional agricultural trends (pest outbreaks, crop health) via EmailJS.🛠️ Tech StackComponentTechnologyMobileAndroid (Java/Kotlin)AI/LLMGoogle Gemini (via Vertex AI / Gemini API)BackendPython/Node.js hosted on RenderDatabaseSupabase (PostgreSQL & Vector Search)StorageSupabase Storage (Audio Files)AuthFirebase AuthenticationAutomationEmailJS (Reporting)🔄 System ArchitectureInput: Farmer uploads an audio query to Supabase Storage.Processing: The Render backend triggers an AI search.Response: * If found in DB: Audio answer is retrieved instantly.If not found: Gemini generates a labeled AI response.Community: The query enters the community pool for human experts.Notification: Once an admin approves a community answer, a Firebase Cloud Messaging notification is sent.📈 ImpactDesigned for Solve for India and Techno Agro (Euphoria 2K26), Gyan Mitra focuses on:Inclusivity: Overcoming literacy barriers with voice.Decision Support: Providing government-level statistical insights for regional crop health.📄 LicenseThis project is developed for academic and competition purposes at Kalasalingam Academy of Research and Education.
