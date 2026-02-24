@@ -9,6 +9,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/services/gemini_service.dart';
+import '../../../../core/providers/language_provider.dart';
 
 // Providers
 final chatHistoryProvider = StateProvider.autoDispose<List<ChatMessage>>((ref) => []);
@@ -112,8 +113,10 @@ class _ChatInteractionScreenState extends ConsumerState<ChatInteractionScreen> {
 
       if (imageToAnalyze != null) {
         // Multimodal Analysis
+        final userLangCode = ref.read(languageProvider);
+        final userLangName = GeminiService.langCodeToName(userLangCode);
         final query = text.isNotEmpty ? text : "Diagnose this crop issue.";
-        final jsonResponse = await geminiService.analyzeCropDisease(imageToAnalyze, query);
+        final jsonResponse = await geminiService.analyzeCropDisease(imageToAnalyze, query, language: userLangName);
         
         // Parse friendly summary from JSON
         try {
@@ -122,14 +125,16 @@ class _ChatInteractionScreenState extends ConsumerState<ChatInteractionScreen> {
            if (data.containsKey('summary_for_farmer')) {
              responseText = data['summary_for_farmer'];
            } else {
-             responseText = "பகுப்பாய்வு முடிந்தது. விவரங்களை கீழே காணவும்:\n$cleanJson";
+             responseText = "Analysis complete. Details:\n$cleanJson";
            }
         } catch (e) {
            responseText = jsonResponse; // Fallback to raw text
         }
       } else {
         // Text-only Query
-        responseText = await geminiService.generateAnswer(text);
+        final userLangCode = ref.read(languageProvider);
+        final userLangName = GeminiService.langCodeToName(userLangCode);
+        responseText = await geminiService.generateAnswer(text, language: userLangName);
       }
 
       // 2. Add AI Response
@@ -137,7 +142,7 @@ class _ChatInteractionScreenState extends ConsumerState<ChatInteractionScreen> {
        ref.read(chatHistoryProvider.notifier).update((state) => [...state, aiMsg]);
 
     } catch (e) {
-      final errorMsg = ChatMessage(text: "மன்னிக்கவும், ஒரு பிழை ஏற்பட்டது: $e", isUser: false);
+      final errorMsg = ChatMessage(text: "Sorry, an error occurred: $e", isUser: false);
       ref.read(chatHistoryProvider.notifier).update((state) => [...state, errorMsg]);
     } finally {
       ref.read(isChatProcessingProvider.notifier).state = false;
@@ -161,6 +166,7 @@ class _ChatInteractionScreenState extends ConsumerState<ChatInteractionScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       appBar: AppBar(
         title: const Text('Ask Gram Gyan'),
@@ -168,114 +174,128 @@ class _ChatInteractionScreenState extends ConsumerState<ChatInteractionScreen> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          // ── Chat List ──
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: history.length + (isProcessing ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == history.length) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                final msg = history[index];
-                return _ChatBubble(message: msg, isDark: isDark);
-              },
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Chat List ──
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                itemCount: history.length + (isProcessing ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == history.length) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final msg = history[index];
+                  return _ChatBubble(message: msg, isDark: isDark);
+                },
+              ),
             ),
-          ),
 
-          // ── Image Preview ──
-          if (_selectedImage != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: isDark ? Colors.black12 : Colors.grey.shade100,
-              child: Row(
-                children: [
-                  Stack(
-                    alignment: Alignment.topRight,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(_selectedImage!, width: 80, height: 80, fit: BoxFit.cover),
-                      ),
-                      Positioned(
-                        top: -4,
-                        right: -4,
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedImage = null),
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
+            // ── Image Preview ──
+            if (_selectedImage != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: isDark ? Colors.black12 : Colors.grey.shade100,
+                child: Row(
+                  children: [
+                    Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(_selectedImage!, width: 80, height: 80, fit: BoxFit.cover),
+                        ),
+                        Positioned(
+                          top: -4,
+                          right: -4,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedImage = null),
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close, size: 16, color: Colors.white),
                             ),
-                            child: const Icon(Icons.close, size: 16, color: Colors.white),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Image selected for analysis',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: Theme.of(context).hintColor,
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Image selected for analysis',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: Theme.of(context).hintColor,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+
+            // ── Input Area ──
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : AppColors.cardLight,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Image Button
+                  IconButton(
+                    onPressed: isProcessing ? null : () => _showImagePickerModal(context),
+                    icon: Icon(Icons.add_photo_alternate_rounded, color: AppColors.primary),
+                  ),
+                  // Text Field
+                  Expanded(
+                    child: Container(
+                      constraints: const BoxConstraints(maxHeight: 120),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isDark ? AppColors.dividerDark : AppColors.divider,
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _textController,
+                        decoration: const InputDecoration(
+                          hintText: 'Type your question...',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        ),
+                        maxLines: null,
+                        textCapitalization: TextCapitalization.sentences,
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Send Button
+                  IconButton(
+                    onPressed: isProcessing ? null : _sendMessage,
+                    icon: const Icon(Icons.send_rounded, color: AppColors.primary),
                   ),
                 ],
               ),
             ),
-
-          // ── Input Area ──
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : AppColors.cardLight,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // Image Button
-                IconButton(
-                  onPressed: isProcessing ? null : () => _showImagePickerModal(context),
-                  icon: Icon(Icons.add_photo_alternate_rounded, color: AppColors.primary),
-                ),
-                // Text Field
-                Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    decoration: const InputDecoration(
-                      hintText: 'Type your question...',
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    maxLines: null,
-                    textCapitalization: TextCapitalization.sentences,
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
-                ),
-                // Send Button
-                IconButton(
-                  onPressed: isProcessing ? null : _sendMessage,
-                  icon: const Icon(Icons.send_rounded, color: AppColors.primary),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -1,6 +1,6 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, Query, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
-from app.services.sarvam import speech_to_text, text_to_speech, translate_text
+from app.services.sarvam import speech_to_text, text_to_speech, translate_text, transliterate_to_native_script, _is_tanglish
 import shutil
 import os
 import uuid
@@ -32,7 +32,7 @@ def is_tamil(text: str) -> bool:
     return False
 
 @router.post("/transcribe")
-async def transcribe_audio(file: UploadFile = File(...), language_code: str = "ta-IN"):
+async def transcribe_audio(file: UploadFile = File(...), language_code: str = Query(..., description="Sarvam language code, e.g. ta-IN, hi-IN, pa-IN")):
     """
     Accepts an audio file upload and returns the transcription from Sarvam AI.
     """
@@ -71,7 +71,11 @@ async def translate(request: TranslateRequest):
 
 @router.post("/process")
 @router.post("/process-audio")
-async def process_audio(file: UploadFile = File(...), source_language: str = "ta-IN", target_language: str = "en-IN"):
+async def process_audio(
+    file: UploadFile = File(...), 
+    source_language: str = Form("ta-IN"), 
+    target_language: str = Form("en-IN")
+):
     """
     Full workflow: Upload Audio -> STT -> Translate -> Return JSON.
     """
@@ -81,8 +85,16 @@ async def process_audio(file: UploadFile = File(...), source_language: str = "ta
             shutil.copyfileobj(file.file, buffer)
         
         # 1. STT
-        # We perform STT (defaulting to ta-IN as it often handles mixed speech well)
         transcript = await speech_to_text(temp_filename, source_language)
+
+        # 1b. Tanglish guard — if STT returned Latin text for a non-English language,
+        #     convert it to native Indic script using Sarvam /transliterate
+        if _is_tanglish(transcript, source_language):
+            import logging
+            logging.getLogger(__name__).info(
+                f"Tanglish detected in STT output for {source_language}. Transliterating to native script."
+            )
+            transcript = await transliterate_to_native_script(transcript, source_language)
         
         # 2. Language Detection & Translation
         detected_source_lang = source_language
@@ -91,19 +103,11 @@ async def process_audio(file: UploadFile = File(...), source_language: str = "ta
         if not transcript or not transcript.strip():
              translation = ""
         else:
-             if is_tamil(transcript):
-                 # It's Tamil, proceed with translation to English
-                 detected_source_lang = "ta-IN"
-                 detected_target_lang = "en-IN"
-                 translation = await translate_text(transcript, detected_source_lang, detected_target_lang)
-             else:
-                 # It's likely English (or at least not Tamil), so we treat it as English
-                 # User Requirement: "if it is english no need for translation"
-                 detected_source_lang = "en-IN"
-                 # We set translation same as transcript so the UI shows it clearly in the "Translation" box too,
-                 # or we could leave it empty. Setting it to transcript makes the "English Translation" field useful.
+             if detected_source_lang == "en-IN":
                  translation = transcript 
-                 detected_target_lang = "en-IN"
+             else:
+                 # Translate native transcript -> English (pivot language)
+                 translation = await translate_text(transcript, detected_source_lang, detected_target_lang)
 
         return ProcessResponse(
             transcript=transcript,
@@ -130,6 +134,23 @@ async def speak_text(request: SpeakRequest):
     """
     try:
         audio_content = await text_to_speech(request.text, request.language_code)
+        
+        def iterfile():
+            yield audio_content
+            
+        return StreamingResponse(iterfile(), media_type="audio/wav")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/stream")
+async def stream_text(text: str, language_code: str = Query(..., description="Sarvam language code, e.g. ta-IN, hi-IN, pa-IN")):
+    """
+    GET endpoint for instant streaming via audio players.
+    """
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    try:
+        audio_content = await text_to_speech(text, language_code)
         
         def iterfile():
             yield audio_content

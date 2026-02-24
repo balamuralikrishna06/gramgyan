@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supa;
 
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/language_provider.dart';
 import '../../../../core/services/auth_repository.dart';
 import '../../domain/models/auth_state.dart' as app;
 
@@ -14,69 +16,92 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 /// Auth state notifier — manages the auth state machine.
 final authStateProvider =
     StateNotifierProvider<AuthNotifier, app.AuthState>((ref) {
-  return AuthNotifier(ref.read(authRepositoryProvider));
+  return AuthNotifier(ref.read(authRepositoryProvider), ref);
 });
 
 /// StateNotifier controlling authentication state transitions.
 class AuthNotifier extends StateNotifier<app.AuthState> {
   final AuthRepository _repo;
-  StreamSubscription<supa.AuthState>? _authSub;
+  final Ref _ref;
+  StreamSubscription<User?>? _authSub;
 
-  AuthNotifier(this._repo) : super(const app.AuthInitial()) {
-    // Listen for Supabase auth changes (critical for OAuth redirect flow)
-    _authSub = supa.Supabase.instance.client.auth.onAuthStateChange
-        .listen((supa.AuthState data) {
-      if (data.event == supa.AuthChangeEvent.signedIn && data.session != null) {
-        _handleSignedIn();
-      } else if (data.event == supa.AuthChangeEvent.signedOut) {
+  AuthNotifier(this._repo, this._ref) : super(const app.AuthInitial()) {
+    // Listen for Firebase auth changes
+    _authSub = _repo.authStateChanges.listen((User? user) {
+      if (user != null) {
+        _handleSignedIn(user);
+      } else {
         state = const app.AuthUnauthenticated();
       }
     });
   }
 
-  /// Helper to extract display name from user metadata or email
-  String _extractName(supa.User user) {
-    final metadata = user.userMetadata;
-    return (metadata?['full_name'] as String?) ??
-        (metadata?['name'] as String?) ??
-        user.email?.split('@').first ??
-        'Farmer';
-  }
+  /// Handle a successful sign-in event from Firebase.
+  Future<void> _handleSignedIn(User user) async {
+    try {
+      final backendData = await _repo.verifyWithBackend();
+      final isProfileComplete = backendData['profile_complete'] as bool? ?? false;
+      final userData = backendData['user_data'] as Map<String, dynamic>? ?? {};
 
-  /// Handle a successful sign-in event from Supabase.
-  Future<void> _handleSignedIn() async {
-    final user = _repo.currentUser;
-    if (user == null) return;
+      // Prefer name from Supabase DB over Firebase (phone users have no Firebase displayName)
+      final dbName = userData['name'] as String?;
+      final resolvedName = (dbName != null && dbName.isNotEmpty) ? dbName : user.displayName;
 
-    final profileComplete = await _repo.checkProfileCompletion();
-    final displayName = _extractName(user);
+      // Supabase internal UUID
+      final supabaseUserId = backendData['user_id'] as String?;
 
-    if (!profileComplete) {
+      if (!isProfileComplete) {
+        state = app.AuthProfileIncomplete(
+          userId: supabaseUserId ?? user.uid,
+          email: user.email ?? '',
+          phoneNumber: user.phoneNumber,
+          displayName: resolvedName,
+          avatarUrl: user.photoURL,
+        );
+      } else {
+        // ── Sync language from Supabase → languageProvider ──
+        final dbLanguage = userData['language'] as String?;
+        final langCode = dbLanguage != null ? _syncLanguage(dbLanguage) : null;
+
+        state = app.AuthAuthenticated(
+          userId: supabaseUserId ?? user.uid,
+          email: user.email ?? '',
+          displayName: resolvedName,
+          avatarUrl: user.photoURL,
+          city: userData['city'] as String?,
+          role: userData['role'] as String? ?? 'farmer',
+          language: langCode,  // Directly from Supabase — no Hive race condition
+        );
+      }
+    } catch (e) {
+      // Backend unreachable (e.g. Render sleeping, no network).
+      // Fallback: treat as profile-incomplete so user can still log in / complete profile.
+      // This prevents infinite loading on the splash screen.
       state = app.AuthProfileIncomplete(
-        userId: user.id,
+        userId: user.uid,
         email: user.email ?? '',
-        displayName: displayName,
-        avatarUrl: user.userMetadata?['avatar_url'] as String?,
-      );
-    } else {
-      // Fetch profile to get city and role
-      String? city;
-      String role = 'farmer';
-      try {
-        final profile = await _repo.fetchUserProfile();
-        city = profile?['city'] as String?;
-        role = profile?['role'] as String? ?? 'farmer';
-      } catch (_) {}
-
-      state = app.AuthAuthenticated(
-        userId: user.id,
-        email: user.email ?? '',
-        displayName: displayName,
-        avatarUrl: user.userMetadata?['avatar_url'] as String?,
-        city: city,
-        role: role,
+        phoneNumber: user.phoneNumber,
+        displayName: user.displayName,
+        avatarUrl: user.photoURL,
       );
     }
+  }
+
+  /// Maps the DB language English name (e.g. 'Tamil') → short code ('ta')
+  /// Persists it in languageProvider + Hive. Returns the resolved code.
+  String? _syncLanguage(String dbLanguageName) {
+    final match = AppConstants.supportedLanguages.firstWhere(
+      (l) => l['english']!.toLowerCase() == dbLanguageName.toLowerCase() ||
+             l['name'] == dbLanguageName ||
+             l['code'] == dbLanguageName,
+      orElse: () => {},
+    );
+    final code = match['code'];
+    if (code != null && code.isNotEmpty) {
+      _ref.read(languageProvider.notifier).setLanguage(code);
+      return code;
+    }
+    return null;
   }
 
   @override
@@ -87,114 +112,96 @@ class AuthNotifier extends StateNotifier<app.AuthState> {
 
   /// Check current session on app launch.
   Future<void> checkSession() async {
-    state = const app.AuthLoading('Checking session...');
-
-    try {
-      final user = _repo.currentUser;
-      if (user == null) {
-        state = const app.AuthUnauthenticated();
-        return;
-      }
-
-      final profileComplete = await _repo.checkProfileCompletion();
-      final displayName = _extractName(user);
-
-      if (!profileComplete) {
-        state = app.AuthProfileIncomplete(
-          userId: user.id,
-          email: user.email ?? '',
-          displayName: displayName,
-          avatarUrl: user.userMetadata?['avatar_url'] as String?,
-        );
-      } else {
-        // Fetch profile to get city and role
-        String? city;
-        String role = 'farmer';
-        try {
-          final profile = await _repo.fetchUserProfile();
-          city = profile?['city'] as String?;
-          role = profile?['role'] as String? ?? 'farmer';
-        } catch (_) {}
-
-        state = app.AuthAuthenticated(
-          userId: user.id,
-          email: user.email ?? '',
-          displayName: displayName,
-          avatarUrl: user.userMetadata?['avatar_url'] as String?,
-          city: city,
-          role: role,
-        );
-      }
-    } catch (e) {
-      state = app.AuthError(e.toString());
-    }
-  }
-
-  /// Sign in with Google via OAuth redirect.
-  /// The actual auth state change will come via onAuthStateChange listener
-  /// after the browser redirect completes.
-  Future<void> signInWithGoogle() async {
-    state = const app.AuthLoading('Connecting to Google…');
-
-    try {
-      await _repo.signInWithGoogle();
-      // OAuth opens a browser — auth state will update via onAuthStateChange
-      // Reset to unauthenticated so the UI isn't stuck on loading
-      // if user cancels the browser flow.
-      state = const app.AuthUnauthenticated();
-    } catch (e) {
-      final message = e.toString().contains('cancelled')
-          ? 'Sign-in was cancelled.'
-          : 'Login failed. Please try again.';
-      state = app.AuthError(message);
-    }
-  }
-
-  /// Complete profile and transition to authenticated.
-  Future<void> completeProfile({
-    required String city,
-    required String selectedState,
-    required String language,
-  }) async {
-    state = const app.AuthLoading('Saving profile…');
-
-    try {
-      await _repo.saveUserProfile(
-        city: city,
-        state: selectedState,
-        language: language,
-      );
-    } catch (_) {
-      // DB save failed (table missing / RLS) — non-critical.
-      // Still mark profile as locally complete so user isn't stuck.
-    }
-
     final user = _repo.currentUser;
     if (user != null) {
-      state = app.AuthAuthenticated(
-        userId: user.id,
-        email: user.email ?? '',
-        displayName: _extractName(user),
-        avatarUrl: user.userMetadata?['avatar_url'] as String?,
-        city: city,
-      );
+       await _handleSignedIn(user);
     } else {
       state = const app.AuthUnauthenticated();
     }
   }
 
-  /// Sign out and reset to unauthenticated.
+  /// Sign in with Google.
+  Future<void> signInWithGoogle() async {
+    state = const app.AuthLoading('Connecting to Google…');
+    try {
+      await _repo.signInWithGoogle();
+      // Auth state will update via listener
+    } catch (e) {
+      state = app.AuthError('Login failed: ${e.toString()}');
+    }
+  }
+
+  /// Verify phone number.
+  Future<void> verifyPhoneNumber({
+    required String phoneNumber,
+    required PhoneVerificationCompleted verificationCompleted,
+    required PhoneVerificationFailed verificationFailed,
+    required PhoneCodeSent codeSent,
+    required PhoneCodeAutoRetrievalTimeout codeAutoRetrievalTimeout,
+  }) async {
+    await _repo.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      verificationCompleted: verificationCompleted,
+      verificationFailed: verificationFailed,
+      codeSent: codeSent,
+      codeAutoRetrievalTimeout: codeAutoRetrievalTimeout,
+    );
+  }
+
+  /// Sign in with OTP.
+  Future<void> signInWithOtp(String verificationId, String smsCode) async {
+    state = const app.AuthLoading('Verifying OTP...');
+    try {
+      await _repo.signInWithOtp(
+          verificationId: verificationId, smsCode: smsCode);
+    } catch (e) {
+      state = app.AuthError('OTP Verification failed: ${e.toString()}');
+    }
+  }
+
+  Future<void> completeProfile({
+    required String name,
+    required String city,
+    required String selectedState,
+    required String language,
+    String role = 'farmer',
+    String? phone,
+    String? email,
+  }) async {
+    state = const app.AuthLoading('Saving profile…');
+    try {
+      await _repo.updateProfile(
+        city: city,
+        state: selectedState,
+        language: language,
+        name: name,
+        role: role,
+        phone: phone,
+        email: email,
+      );
+
+      // Immediately sync language to languageProvider so STT uses the right code
+      _syncLanguage(language);
+
+      // Force refresh of state
+      final user = _repo.currentUser;
+      if (user != null) {
+         await _handleSignedIn(user);
+      }
+    } catch (e) {
+      state = app.AuthError('Failed to save profile: ${e.toString()}');
+    }
+  }
+
+  /// Sign out.
   Future<void> signOut() async {
     state = const app.AuthLoading('Signing out…');
     try {
       await _repo.signOut();
-    } catch (_) {
-      // Always go to unauthenticated even if signOut fails
-    }
+    } catch (_) {}
     state = const app.AuthUnauthenticated();
   }
-
-  /// Reset error state to unauthenticated (for retry).
+  
   void resetError() {
     state = const app.AuthUnauthenticated();
   }

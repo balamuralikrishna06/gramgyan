@@ -49,8 +49,16 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
   Future<void> _handleApprove(Map<String, dynamic> submission) async {
     try {
+      final authState = ref.read(authStateProvider);
+      final userId = (authState is AuthAuthenticated) ? authState.userId : '';
+
+      if (userId.isEmpty) {
+         throw Exception('Cannot approve: User ID is missing.');
+      }
+
       final repo = ref.read(reportRepositoryProvider);
-      await repo.approveSubmission(submission);
+      await repo.approveSubmission(submission, userId: userId); // Pass userId
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Submission Approved! 🌾')),

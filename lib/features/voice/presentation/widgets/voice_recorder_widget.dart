@@ -5,6 +5,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../data/services/voice_service.dart'; // This is now the record-based service
 import '../../../../core/providers/service_providers.dart';
 import '../../../../core/services/sarvam_api_service.dart';
+import '../../../../core/providers/language_provider.dart';
 
 class VoiceRecorderWidget extends ConsumerStatefulWidget {
   final Function(String transcript, String translation, String? audioPath) onResult;
@@ -82,8 +83,11 @@ class _VoiceRecorderWidgetState extends ConsumerState<VoiceRecorderWidget>
 
     if (filePath != null) {
       try {
+        final userLangCode = ref.read(languageProvider) ?? 'en';
+        final sourceLang = toSarvamCode(userLangCode);
+
         final sarvamService = ref.read(sarvamApiServiceProvider);
-        final response = await sarvamService.processAudio(filePath);
+        final response = await sarvamService.processAudio(filePath, sourceLanguage: sourceLang);
         
         if (mounted) {
           widget.onResult(response.transcript, response.translation, filePath);

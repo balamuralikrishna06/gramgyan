@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -9,20 +10,52 @@ import '../../features/home/presentation/providers/knowledge_providers.dart';
 
 /// Knowledge card widget with crop icon, status tag, farmer info,
 /// transcript preview, reply count, and Answer CTA.
-class KnowledgeCard extends ConsumerWidget {
+class KnowledgeCard extends ConsumerStatefulWidget {
   final KnowledgePost post;
 
   const KnowledgeCard({super.key, required this.post});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<KnowledgeCard> createState() => _KnowledgeCardState();
+}
+
+class _KnowledgeCardState extends ConsumerState<KnowledgeCard> {
+  late AudioPlayer _audioPlayer;
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (state == PlayerState.completed) {
+        if (mounted) ref.read(playingPostIdProvider.notifier).state = null;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final upvotedPosts = ref.watch(upvotedPostsProvider);
-    final isUpvoted = upvotedPosts.contains(post.id);
+    final isUpvoted = upvotedPosts.contains(widget.post.id);
     final playingId = ref.watch(playingPostIdProvider);
-    final isPlaying = playingId == post.id;
+    final isPlaying = playingId == widget.post.id;
 
-    return Container(
+    // Listen for play state changes from other cards
+    if (playingId != widget.post.id) {
+       // Stop audio if another card starts playing
+       _audioPlayer.stop();
+    }
+
+    return GestureDetector(
+      onTap: () => context.push('/knowledge/${widget.post.id}'),
+      child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.cardLight,
@@ -62,7 +95,7 @@ class KnowledgeCard extends ConsumerWidget {
                   ),
                   child: Center(
                     child: Text(
-                      _cropEmoji(post.crop),
+                      _cropEmoji(widget.post.crop),
                       style: const TextStyle(fontSize: 20),
                     ),
                   ),
@@ -73,14 +106,14 @@ class KnowledgeCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        post.crop,
+                        widget.post.crop,
                         style: AppTextStyles.titleMedium.copyWith(
                           color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        post.category,
+                        widget.post.category,
                         style: AppTextStyles.labelSmall.copyWith(
                           color:
                               Theme.of(context).colorScheme.onSurfaceVariant,
@@ -90,8 +123,8 @@ class KnowledgeCard extends ConsumerWidget {
                   ),
                 ),
                 _StatusBadge(
-                  label: post.verified ? 'Solved' : 'Needs Solution',
-                  color: post.verified ? AppColors.success : AppColors.accent,
+                  label: widget.post.verified ? 'Solved' : 'Needs Solution',
+                  color: widget.post.verified ? AppColors.success : AppColors.accent,
                 ),
               ],
             ),
@@ -111,14 +144,14 @@ class KnowledgeCard extends ConsumerWidget {
                   _InfoRow(
                     icon: Icons.person_outline_rounded,
                     label: 'Farmer',
-                    value: post.farmerName,
+                    value: widget.post.farmerName,
                     isDark: isDark,
                   ),
                   const SizedBox(height: 8),
                   _InfoRow(
                     icon: Icons.location_on_outlined,
-                    label: 'Village',
-                    value: post.location,
+                    label: 'City',
+                    value: widget.post.location,
                     isDark: isDark,
                   ),
                 ],
@@ -129,7 +162,7 @@ class KnowledgeCard extends ConsumerWidget {
 
             // ── Transcript Preview (2 lines max) ──
             Text(
-              post.transcript,
+              widget.post.transcript,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: AppTextStyles.bodyMedium.copyWith(
@@ -146,20 +179,26 @@ class KnowledgeCard extends ConsumerWidget {
                 // Play button
                 _ActionChip(
                   icon: isPlaying
-                      ? Icons.stop_rounded
+                      ? Icons.pause_rounded
                       : Icons.play_arrow_rounded,
-                  label: isPlaying ? 'Stop' : 'Play',
+                  label: isPlaying ? 'Pause' : 'Play',
                   isDark: isDark,
-                  onTap: () {
+                  onTap: () async {
                     if (isPlaying) {
+                      await _audioPlayer.pause();
                       ref.read(playingPostIdProvider.notifier).state = null;
                     } else {
-                      ref.read(playingPostIdProvider.notifier).state = post.id;
-                      Future.delayed(const Duration(seconds: 5), () {
-                        if (ref.read(playingPostIdProvider) == post.id) {
-                          ref.read(playingPostIdProvider.notifier).state = null;
+                      ref.read(playingPostIdProvider.notifier).state = widget.post.id;
+                      if (widget.post.audioUrl.isNotEmpty) {
+                        try {
+                           await _audioPlayer.play(UrlSource(widget.post.audioUrl));
+                        } catch(e) {
+                           debugPrint('Error playing audio: $e');
+                           if (mounted) ref.read(playingPostIdProvider.notifier).state = null;
                         }
-                      });
+                      } else {
+                         if (mounted) ref.read(playingPostIdProvider.notifier).state = null;
+                      }
                     }
                   },
                 ),
@@ -201,7 +240,7 @@ class KnowledgeCard extends ConsumerWidget {
                 const Spacer(),
 
                 // Karma / Upvote or Answer CTA
-                if (!post.verified)
+                if (!widget.post.verified)
                   GestureDetector(
                     onTap: () => context.push('/ask-question'),
                     child: Container(
@@ -233,16 +272,20 @@ class KnowledgeCard extends ConsumerWidget {
                     icon: isUpvoted
                         ? Icons.favorite_rounded
                         : Icons.favorite_border_rounded,
-                    label: '${post.karma + (isUpvoted ? 1 : 0)}',
+                    label: '${widget.post.karma + (isUpvoted ? 1 : 0)}',
                     isDark: isDark,
                     highlighted: isUpvoted,
                     onTap: () {
+                      final repo = ref.read(knowledgeRepositoryProvider);
                       final set =
                           Set<String>.from(ref.read(upvotedPostsProvider));
                       if (isUpvoted) {
-                        set.remove(post.id);
+                        // User can't downvote easily yet, just remove from local set
+                        set.remove(widget.post.id);
                       } else {
-                        set.add(post.id);
+                        set.add(widget.post.id);
+                        // Make remote API call to update database
+                        repo.upvotePost(widget.post.id).ignore();
                       }
                       ref.read(upvotedPostsProvider.notifier).state = set;
                     },
@@ -252,6 +295,7 @@ class KnowledgeCard extends ConsumerWidget {
           ],
         ),
       ),
+    ),
     );
   }
 

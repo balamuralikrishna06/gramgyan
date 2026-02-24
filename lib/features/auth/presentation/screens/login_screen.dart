@@ -10,6 +10,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/models/auth_state.dart';
 import '../providers/auth_providers.dart';
+import 'phone_login_sheet.dart';
 
 /// Welcome / Login Screen with Google Sign-In.
 /// Shows app logo, tagline, animated floating mic circles,
@@ -61,6 +62,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     ref.read(authStateProvider.notifier).signInWithGoogle();
   }
 
+  void _handlePhoneSignIn() {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const PhoneLoginSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
@@ -103,95 +114,98 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               ..._buildFloatingCircles(isDark),
 
               // ── Main Content ──
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Column(
-                  children: [
-                    const Spacer(flex: 2),
+              Positioned.fill(
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: Column(
+                    children: [
+                      const Spacer(flex: 2),
 
-                    // ── Logo ──
-                    Container(
-                      width: 110,
-                      height: 110,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary
-                                .withValues(alpha: isDark ? 0.3 : 0.15),
-                            blurRadius: 30,
-                            spreadRadius: 4,
+                      // ── Logo ──
+                      Container(
+                        width: 110,
+                        height: 110,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary
+                                  .withValues(alpha: isDark ? 0.3 : 0.15),
+                              blurRadius: 30,
+                              spreadRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            fit: BoxFit.cover,
                           ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          fit: BoxFit.cover,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
-                    // ── App Name ──
-                    Text(
-                      AppConstants.appName,
-                      style: AppTextStyles.displayLarge.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-
-                    // ── Tagline ──
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary
-                            .withValues(alpha: isDark ? 0.15 : 0.08),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        AppConstants.appTagline,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
-                          letterSpacing: 0.3,
+                      // ── App Name ──
+                      Text(
+                        AppConstants.appName,
+                        style: AppTextStyles.displayLarge.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 6),
 
-                    const Spacer(flex: 3),
-
-                    // ── Auth Content (button / loading / error) ──
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: _buildAuthContent(authState, isDark),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // ── Terms ──
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 40),
-                      child: Text(
-                        'By continuing, you agree to our\nTerms of Service & Privacy Policy',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant
-                              .withValues(alpha: 0.6),
-                          height: 1.5,
+                      // ── Tagline ──
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary
+                              .withValues(alpha: isDark ? 0.15 : 0.08),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          AppConstants.appTagline,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            letterSpacing: 0.3,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-                  ],
+
+                      const Spacer(flex: 3),
+
+                      // ── Auth Content (button / loading / error) ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: _buildAuthContent(authState, isDark),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ── Terms ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                        child: Text(
+                          'By continuing, you agree to our\nTerms of Service & Privacy Policy',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant
+                                .withValues(alpha: 0.6),
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
                 ),
               ),
+
             ],
           ),
         ),
@@ -203,6 +217,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     // ── Loading State ──
     if (authState is AuthLoading) {
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
             width: 36,
@@ -217,6 +232,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           const SizedBox(height: 16),
           Text(
             authState.message,
+            textAlign: TextAlign.center,
             style: AppTextStyles.bodyMedium.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -273,13 +289,57 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
           ),
           const SizedBox(height: 12),
+          const SizedBox(height: 12),
           _buildGoogleButton(isDark),
+          const SizedBox(height: 12),
+          _buildPhoneButton(isDark),
         ],
       );
     }
 
-    // ── Default: Google Sign-In Button ──
-    return _buildGoogleButton(isDark);
+    // ── Default: Sign-In Buttons ──
+    return Column(
+      children: [
+        _buildGoogleButton(isDark),
+        const SizedBox(height: 12),
+        _buildPhoneButton(isDark),
+      ],
+    );
+  }
+
+  Widget _buildPhoneButton(bool isDark) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: OutlinedButton(
+        onPressed: _handlePhoneSignIn,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          side: BorderSide(
+            color: AppColors.primary.withValues(alpha: 0.4),
+            width: 1.5,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.phone_rounded,
+                color: Theme.of(context).colorScheme.onSurface),
+            const SizedBox(width: 14),
+            Text(
+              'Continue with Phone',
+              style: AppTextStyles.titleMedium.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildGoogleButton(bool isDark) {

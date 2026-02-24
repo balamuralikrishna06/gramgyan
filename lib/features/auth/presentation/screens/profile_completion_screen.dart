@@ -28,6 +28,9 @@ class _ProfileCompletionScreenState
 
   final _formKey = GlobalKey<FormState>();
   final _villageController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   String? _selectedState;
   String? _selectedLanguage;
   String? _selectedCrop;
@@ -35,6 +38,12 @@ class _ProfileCompletionScreenState
   // Cache user details to prevent flicker during loading state
   String? _cachedDisplayName;
   String? _cachedAvatarUrl;
+
+  // Live name shown in the profile card (updates as user types)
+  String get _liveDisplayName =>
+      _nameController.text.trim().isNotEmpty
+          ? _nameController.text.trim()
+          : (_cachedDisplayName ?? '');
 
   @override
   void initState() {
@@ -48,12 +57,17 @@ class _ProfileCompletionScreenState
       curve: Curves.easeOut,
     );
     _fadeController.forward();
+    // Rebuild card header when user types their name
+    _nameController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
     _villageController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -76,9 +90,16 @@ class _ProfileCompletionScreenState
 
     HapticFeedback.mediumImpact();
     ref.read(authStateProvider.notifier).completeProfile(
+          name: _nameController.text.trim(),
           city: _villageController.text.trim(),
           selectedState: _selectedState!,
           language: _selectedLanguage!,
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : '+91${_phoneController.text.trim()}',
+          email: _emailController.text.trim().isEmpty
+              ? null
+              : _emailController.text.trim(),
         );
   }
 
@@ -89,14 +110,25 @@ class _ProfileCompletionScreenState
     final authState = ref.watch(authStateProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Cache user details to prevent flicker during loading state
+    String? currentEmail;
+    String? currentPhone;
+
     // Extract user info from auth state and update cache
     if (authState is AuthProfileIncomplete) {
       _cachedDisplayName = authState.displayName;
       _cachedAvatarUrl = authState.avatarUrl;
+      currentEmail = authState.email;
+      currentPhone = authState.phoneNumber;
+      if (_nameController.text.isEmpty && authState.displayName != null) {
+        _nameController.text = authState.displayName!;
+      }
     }
 
-    // Use cached values if state is loading (prevent fallback to 'Farmer')
-    final displayName = _cachedDisplayName;
+    final isPhoneLogin = currentPhone != null && currentPhone.isNotEmpty;
+
+    // Use live-typed name for card display; fall back to cached Firebase name
+    final displayName = _liveDisplayName.isNotEmpty ? _liveDisplayName : null;
     final avatarUrl = _cachedAvatarUrl;
 
     // Navigate on authenticated
@@ -188,39 +220,41 @@ class _ProfileCompletionScreenState
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                displayName ?? 'Farmer',
+                                displayName ?? 'Verify your details',
                                 style: AppTextStyles.titleMedium.copyWith(
                                   color: Theme.of(context)
                                       .colorScheme
                                       .onSurface,
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.success
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.check_circle_rounded,
-                                        size: 12, color: AppColors.success),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Google verified',
-                                      style:
-                                          AppTextStyles.labelSmall.copyWith(
-                                        color: AppColors.success,
-                                        fontWeight: FontWeight.w600,
+                              if (displayName != null) ...[
+                                const SizedBox(height: 2),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.check_circle_rounded,
+                                          size: 12, color: AppColors.success),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Verified Account',
+                                        style:
+                                            AppTextStyles.labelSmall.copyWith(
+                                          color: AppColors.success,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         ),
@@ -228,6 +262,24 @@ class _ProfileCompletionScreenState
                     ),
                   ),
                   const SizedBox(height: 28),
+
+                  // ── Name ──
+                  _buildLabel('Full Name'),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _nameController,
+                    enabled: !isLoading,
+                    decoration: InputDecoration(
+                      hintText: 'Enter your full name',
+                      prefixIcon: const Icon(Icons.person_outline_rounded),
+                      prefixIconColor: isDark
+                          ? AppColors.primaryLight
+                          : AppColors.primary,
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 20),
 
                   // ── City ──
                   _buildLabel('City'),
@@ -245,6 +297,56 @@ class _ProfileCompletionScreenState
                     validator: (v) =>
                         (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
+                  const SizedBox(height: 20),
+
+                  // ── Phone or Email Number (optional) ──
+                  if (isPhoneLogin) ...[
+                    _buildLabel('Email (Optional)'),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _emailController,
+                      enabled: !isLoading,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        hintText: 'Enter your email address',
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        prefixIconColor: isDark
+                            ? AppColors.primaryLight
+                            : AppColors.primary,
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null; // optional
+                        if (!v.contains('@')) return 'Enter a valid email';
+                        return null;
+                      },
+                    ),
+                  ] else ...[
+                    _buildLabel('Phone Number (Optional)'),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _phoneController,
+                      enabled: !isLoading,
+                      keyboardType: TextInputType.phone,
+                      maxLength: 10,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      decoration: InputDecoration(
+                        hintText: 'Enter 10-digit mobile number',
+                        prefixText: '+91 ',
+                        prefixIcon: const Icon(Icons.phone_outlined),
+                        prefixIconColor: isDark
+                            ? AppColors.primaryLight
+                            : AppColors.primary,
+                        counterText: '',
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null; // optional
+                        if (v.trim().length != 10) return 'Enter a valid 10-digit number';
+                        return null;
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 20),
 
                   // ── State ──

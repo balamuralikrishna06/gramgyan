@@ -1,14 +1,13 @@
-import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../shared/widgets/animated_mic_button.dart';
-import '../providers/discussion_providers.dart';
+import '../../voice/presentation/widgets/voice_recorder_widget.dart';
+import '../../map/presentation/providers/map_providers.dart';
 
 /// Screen for adding a solution / answer to a question.
 class AddSolutionScreen extends ConsumerStatefulWidget {
@@ -21,58 +20,19 @@ class AddSolutionScreen extends ConsumerStatefulWidget {
 }
 
 class _AddSolutionScreenState extends ConsumerState<AddSolutionScreen> {
-  bool _isRecording = false;
   bool _isProcessing = false;
   bool _hasTranscript = false;
-  bool _isSubmitting = false;
-  int _seconds = 0;
-  Timer? _timer;
   String _transcript = '';
+  String _translationText = '';
+  String? _audioPath;
 
-  void _toggleRecording() {
-    if (_isRecording) {
-      _stopRecording();
-    } else {
-      _startRecording();
-    }
-  }
-
-  void _startRecording() {
+  void _handleRecordingResult(String transcript, String translation, String? audioPath) {
     setState(() {
-      _isRecording = true;
-      _isProcessing = false;
-      _hasTranscript = false;
-      _seconds = 0;
-      _transcript = '';
+      _transcript = transcript;
+      _translationText = translation;
+      _audioPath = audioPath;
+      _hasTranscript = true;
     });
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _seconds++);
-    });
-  }
-
-  void _stopRecording() {
-    _timer?.cancel();
-    setState(() {
-      _isRecording = false;
-      _isProcessing = true;
-    });
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      final transcripts = AppConstants.mockTranscripts;
-      setState(() {
-        _isProcessing = false;
-        _hasTranscript = true;
-        _transcript =
-            transcripts[DateTime.now().millisecond % transcripts.length];
-      });
-    });
-  }
-
-  String get _timerDisplay {
-    final m = (_seconds ~/ 60).toString().padLeft(2, '0');
-    final s = (_seconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
   }
 
   Future<void> _submitSolution() async {
@@ -84,7 +44,7 @@ class _AddSolutionScreenState extends ConsumerState<AddSolutionScreen> {
             style: AppTextStyles.titleMedium
                 .copyWith(fontWeight: FontWeight.w600)),
         content: Text(
-          'Your solution will be shared with the farmer who asked this question.',
+          'Your solution will be submitted to our agricultural experts for verification. Once approved, it will be shared with the farmer.',
           style: AppTextStyles.bodyMedium,
         ),
         actions: [
@@ -102,36 +62,44 @@ class _AddSolutionScreenState extends ConsumerState<AddSolutionScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    setState(() => _isSubmitting = true);
+    setState(() => _isProcessing = true);
 
-    final repo = ref.read(discussionRepositoryProvider);
-    await repo.addSolution(
-      questionId: widget.questionId,
-      transcript: _transcript,
-    );
+    try {
+      final repo = ref.read(reportRepositoryProvider);
+      await repo.submitAnswerForModeration(
+        questionId: widget.questionId,
+        latitude: 0, // Fallback, could pass actual location if needed
+        longitude: 0,
+        farmerName: '', // Fetched from auth profile inside repo
+        location: 'Unknown',
+        audioFile: _audioPath != null ? File(_audioPath!) : null,
+        manualTranscript: _transcript,
+        translatedText: _translationText,
+      );
 
-    // Invalidate providers to refresh data
-    ref.invalidate(solutionsProvider(widget.questionId));
-    ref.invalidate(questionsProvider);
+      if (!mounted) return;
 
-    if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Solution submitted for review! 🌾'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Solution posted! +10 karma 🎉'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-
-    context.pop();
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+      context.pop();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -147,136 +115,78 @@ class _AddSolutionScreenState extends ConsumerState<AddSolutionScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color:
-                            isDark ? AppColors.cardDark : AppColors.cardLight,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark
-                              ? AppColors.dividerDark
-                              : AppColors.divider,
-                        ),
-                      ),
-                      child: const Icon(Icons.arrow_back_rounded, size: 20),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text('Add Solution', style: AppTextStyles.headlineMedium),
+                   GestureDetector(
+                     onTap: () => context.pop(),
+                     child: Container(
+                       padding: const EdgeInsets.all(10),
+                       decoration: BoxDecoration(
+                         color: isDark ? AppColors.cardDark : AppColors.cardLight,
+                         shape: BoxShape.circle,
+                         border: Border.all(
+                           color: isDark ? AppColors.dividerDark : AppColors.divider,
+                         ),
+                       ),
+                       child: const Icon(Icons.arrow_back_rounded, size: 20),
+                     ),
+                   ),
+                   const SizedBox(width: 12),
+                   Text('Record Answer', style: AppTextStyles.headlineMedium),
                 ],
               ),
             ),
 
             const Spacer(flex: 1),
 
-            // ── Mic Button ──
-            AnimatedMicButton(
-              isRecording: _isRecording,
-              onTap: _isProcessing ? () {} : _toggleRecording,
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── Timer / Status ──
-            if (_isRecording)
-              Text(
-                _timerDisplay,
-                style: AppTextStyles.displayMedium.copyWith(
-                  color: AppColors.error,
-                  fontWeight: FontWeight.w700,
-                ),
+            // ── Main Content ──
+            if (!_hasTranscript)
+              VoiceRecorderWidget(
+                onResult: _handleRecordingResult,
               )
-            else if (_isProcessing)
-              Column(
-                children: [
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation(
-                        isDark ? AppColors.primaryLight : AppColors.primary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Processing with AI...',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              )
-            else if (!_hasTranscript)
-              Text(
-                'Tap the mic to share your solution',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-
-            const Spacer(flex: 1),
-
-            // ── Transcript + Buttons ──
-            if (_hasTranscript) ...[
+            else ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.cardGreenDark
-                        : AppColors.cardGreenLight,
+                    color: isDark ? AppColors.cardGreenDark : AppColors.cardGreenLight,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color:
-                          isDark ? AppColors.dividerDark : AppColors.divider,
+                      color: isDark ? AppColors.dividerDark : AppColors.divider,
                     ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color:
-                                  AppColors.primary.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.auto_awesome_rounded,
-                              size: 16,
-                              color: isDark
-                                  ? AppColors.primaryLight
-                                  : AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Your Solution',
-                            style: AppTextStyles.titleSmall.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        _transcript,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
-                          height: 1.6,
-                        ),
-                      ),
+                       Row(
+                         children: [
+                           Container(
+                             padding: const EdgeInsets.all(6),
+                             decoration: BoxDecoration(
+                               color: AppColors.primary.withValues(alpha: 0.12),
+                               borderRadius: BorderRadius.circular(8),
+                             ),
+                             child: Icon(
+                               Icons.auto_awesome_rounded,
+                               size: 16,
+                               color: isDark ? AppColors.primaryLight : AppColors.primary,
+                             ),
+                           ),
+                           const SizedBox(width: 10),
+                           Text(
+                             'Your Reviewed Solution',
+                             style: AppTextStyles.titleSmall.copyWith(fontWeight: FontWeight.w600),
+                           ),
+                         ],
+                       ),
+                       const SizedBox(height: 14),
+                       Text(
+                         _transcript,
+                         style: AppTextStyles.bodyMedium.copyWith(
+                           color: Theme.of(context).colorScheme.onSurfaceVariant,
+                           height: 1.6,
+                         ),
+                       ),
                     ],
                   ),
                 ),
@@ -292,6 +202,7 @@ class _AddSolutionScreenState extends ConsumerState<AddSolutionScreen> {
                           setState(() {
                             _hasTranscript = false;
                             _transcript = '';
+                            _audioPath = null;
                           });
                         },
                         icon: const Icon(Icons.refresh_rounded, size: 18),
@@ -301,20 +212,15 @@ class _AddSolutionScreenState extends ConsumerState<AddSolutionScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed:
-                            _isSubmitting ? null : _submitSolution,
-                        icon: _isSubmitting
+                        onPressed: _isProcessing ? null : _submitSolution,
+                        icon: _isProcessing
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               )
                             : const Icon(Icons.send_rounded, size: 18),
-                        label:
-                            Text(_isSubmitting ? 'Posting...' : 'Submit'),
+                        label: Text(_isProcessing ? 'Submitting...' : 'Submit'),
                       ),
                     ),
                   ],
@@ -322,7 +228,7 @@ class _AddSolutionScreenState extends ConsumerState<AddSolutionScreen> {
               ),
             ],
 
-            const SizedBox(height: 32),
+            const Spacer(flex: 1),
           ],
         ),
       ),

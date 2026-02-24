@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,7 +18,9 @@ import '../../../../core/providers/service_providers.dart';
 import '../../../discussion/providers/discussion_providers.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
 import '../widgets/voice_recorder_widget.dart';
+import '../../../../core/services/gemini_service.dart';
 
 enum VoiceMode { ask, share }
 
@@ -40,18 +43,35 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
   // State for matched answer
   String? _matchedAnswer;
-  String? _tamilAnswer;
+  String? _nativeAnswer;  // Answer in user's native language
+  String? _answerLangCode; // Language code used to generate _nativeAnswer (e.g. 'ta')
   int _matchSimilarity = 0;
   bool _isAiAnswer = false;
   String? _matchedAudioUrl;
   final AudioPlayer _audioPlayer = AudioPlayer();
+  
+  // TTS State
+  StreamSubscription<PlayerState>? _ttsSubscription;
+  bool _isTtsPlaying = false;
   
   // Image State
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
 
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      _ttsSubscription = ref.read(textToSpeechServiceProvider).onPlayerStateChanged.listen((state) {
+        if (mounted) setState(() => _isTtsPlaying = state == PlayerState.playing);
+      });
+    });
+  }
+
+  @override
   void dispose() {
+    _ttsSubscription?.cancel();
+    ref.read(textToSpeechServiceProvider).stop();
     _audioPlayer.dispose();
     super.dispose();
   }
@@ -102,7 +122,20 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
     try {
       final authState = ref.read(authStateProvider);
-      final userId = (authState is AuthAuthenticated) ? authState.userId : 'anon';
+      
+      // Real user id (either AuthAuthenticated or Supabase login)
+      String? userId;
+      if (authState is AuthAuthenticated) {
+        userId = authState.userId;
+      } else if (authState is AuthProfileIncomplete) {
+        userId = authState.userId;
+      } else {
+        userId = Supabase.instance.client.auth.currentUser?.id;
+      }
+      
+      // Get farmer name from profile provider
+      final farmerProfile = await ref.read(farmerProfileProvider.future);
+      final farmerName = farmerProfile.name;
       
       // Get location
       double lat = 0;
@@ -160,7 +193,12 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           // Use translation or transcript or default query
           final queryText = _translation ?? _transcript ?? 'What is wrong with this crop?';
           
-          final analysisJson = await geminiService.analyzeCropDisease(_selectedImage!, queryText);
+          final imageLangCode = ref.read(languageProvider);
+          final analysisJson = await geminiService.analyzeCropDisease(
+            _selectedImage!,
+            queryText,
+            language: GeminiService.langCodeToName(imageLangCode),
+          );
           
           String englishSummary = analysisJson;
           
@@ -185,59 +223,67 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
             debugPrint('⚠️ Warning: AI returned Hindi/Devanagari text in English field.');
             // Strategy: Translate this "Hindi" English summary to Actual English first, or directly to Tamil
             // Let's try to translate it to Tamil directly, but setting source to 'hi-IN'
-             final sarvam = ref.read(sarvamApiServiceProvider);
+          final sarvam = ref.read(sarvamApiServiceProvider);
+          
+          // 1. Translate Hindi -> user's native language
+          final userLangCode = ref.read(languageProvider) ?? 'en';
+          final userSarvamCode = toSarvamCode(userLangCode);
+          final nativeSummary = await sarvam.translateText(
+             englishSummary,
+             sourceLanguage: 'hi-IN', // Correct the source
+             targetLanguage: userSarvamCode,
+           );
+
+           // 2. Translate Hindi -> English (for display)
+           final newEnglish = await sarvam.translateText(
+             englishSummary,
+             sourceLanguage: 'hi-IN',
+             targetLanguage: 'en-IN',
+           );
              
-             // 1. Translate Hindi -> Tamil
-             final tamilSummary = await sarvam.translateText(
-                englishSummary,
-                sourceLanguage: 'hi-IN', // Correct the source
-                targetLanguage: 'ta-IN',
-              );
+           setState(() {
+              _isProcessing = false;
+              _loadingMessage = null;
+              _matchedAnswer = newEnglish; // Fixed English
+              _nativeAnswer = nativeSummary;
+              _answerLangCode = userLangCode;
+              _isAiAnswer = true;
+              _matchSimilarity = 0;
+              _matchedAudioUrl = null;
+            });
 
-             // 2. Translate Hindi -> English (for display)
-             final newEnglish = await sarvam.translateText(
-                englishSummary,
-                sourceLanguage: 'hi-IN',
-                targetLanguage: 'en-IN',
-              );
-              
-             setState(() {
-                _isProcessing = false;
-                _loadingMessage = null;
-                _matchedAnswer = newEnglish; // Fixed English
-                _tamilAnswer = tamilSummary;
-                _isAiAnswer = true;
-                _matchSimilarity = 0;
-                _matchedAudioUrl = null;
-              });
-
-              // Speak the result
+              // Speak the result in user's language (fire-and-forget for instant response)
               final tts = ref.read(textToSpeechServiceProvider);
-              await tts.speak(tamilSummary, language: 'ta-IN');
+              unawaited(tts.speak(nativeSummary, language: userSarvamCode));
               
           } else {
-             // Standard Flow (English -> Tamil)
+             // Standard Flow (English -> user's language)
              setState(() => _loadingMessage = 'Translating diagnosis...');
              final sarvam = ref.read(sarvamApiServiceProvider);
-             final tamilSummary = await sarvam.translateText(
-                englishSummary,
-                sourceLanguage: 'en-IN',
-                targetLanguage: 'ta-IN',
-              );
+             final userLangCode = ref.read(languageProvider) ?? 'en';
+             final userSarvamCode = toSarvamCode(userLangCode);
+             final nativeSummary = userSarvamCode == 'en-IN' 
+               ? englishSummary 
+               : await sarvam.translateText(
+                   englishSummary,
+                   sourceLanguage: 'en-IN',
+                   targetLanguage: userSarvamCode,
+                 );
               
               setState(() {
                 _isProcessing = false;
                 _loadingMessage = null;
                 _matchedAnswer = englishSummary;
-                _tamilAnswer = tamilSummary;
+                _nativeAnswer = nativeSummary;
+                _answerLangCode = userLangCode;
                 _isAiAnswer = true;
                 _matchSimilarity = 0;
                 _matchedAudioUrl = null;
               });
 
-              // Speak the result
+              // Speak the result in user's language (fire-and-forget for instant response)
               final tts = ref.read(textToSpeechServiceProvider);
-              await tts.speak(tamilSummary, language: 'ta-IN');
+              unawaited(tts.speak(nativeSummary, language: userSarvamCode));
           }
 
           if (!mounted) return;
@@ -274,29 +320,34 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                              'Solution found in knowledge base.';
           final similarity = ((matchData['similarity'] as num?) ?? 0) * 100;
 
-          // Translate answer to Tamil using Sarvam
-          setState(() => _loadingMessage = 'Translating to Tamil...');
+          // Translate answer to user's native language using Sarvam
+          setState(() => _loadingMessage = 'Translating to your language...');
           final sarvam = ref.read(sarvamApiServiceProvider);
-          final tamilAnswer = await sarvam.translateText(
-            answerText,
-            sourceLanguage: 'en-IN',
-            targetLanguage: 'ta-IN',
-          );
+          final userLangCode = ref.read(languageProvider) ?? 'en';
+          final userSarvamCode = toSarvamCode(userLangCode);
+          final nativeAnswer = userSarvamCode == 'en-IN'
+            ? answerText
+            : await sarvam.translateText(
+                answerText,
+                sourceLanguage: 'en-IN',
+                targetLanguage: userSarvamCode,
+              );
 
           setState(() {
             _isProcessing = false;
             _loadingMessage = null;
             _matchedAnswer = answerText;
-            _tamilAnswer = tamilAnswer;
+            _nativeAnswer = nativeAnswer;
+            _answerLangCode = userLangCode;
             _matchSimilarity = similarity.toInt();
             _isAiAnswer = false;
           });
 
-          // Speak the Tamil answer via flutter_tts or Play Original Audio
+          // Speak the native answer or Play Original Audio
           final audioUrl = matchData['audio_url'] as String?;
           if (audioUrl != null && audioUrl.isNotEmpty) {
             debugPrint('Playing original audio for solution: $audioUrl');
-            await _audioPlayer.stop(); // Stop any previous
+            await _audioPlayer.stop();
             await _audioPlayer.play(UrlSource(audioUrl));
             setState(() {
               _matchedAudioUrl = audioUrl;
@@ -304,49 +355,56 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           } else {
              debugPrint('No original audio, using TTS.');
              final tts = ref.read(textToSpeechServiceProvider);
-             await tts.speak(tamilAnswer, language: 'ta-IN');
-             setState(() {
-               _matchedAudioUrl = null;
-             });
+             // Fire-and-forget — audio loads in background while UI is already showing
+             unawaited(tts.speak(nativeAnswer, language: userSarvamCode));
+             setState(() => _matchedAudioUrl = null);
           }
 
         } else {
           // ❌ NO MATCH → Post to Community + Get AI Answer
           setState(() => _loadingMessage = 'Posting to community & consulting AI...');
           
-          // Post to community discussion in background
-          repo.createQuestion(
-            userId: userId,
-            originalText: _transcript!,
-            englishText: _translation,
-            latitude: lat,
-            longitude: lng,
-            audioFile: File(_audioPath!),
-          ).ignore();
+          // Post to community discussion and await it so it crashes visibly if columns are missing
+          try {
+            await repo.createQuestion(
+              userId: userId,
+              farmerName: farmerName,
+              originalText: _transcript!,
+              englishText: _translation,
+              latitude: lat,
+              longitude: lng,
+              audioFile: File(_audioPath!),
+            );
+          } catch (e) {
+            if (mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                 content: Text(e.toString()),
+                 backgroundColor: Colors.red,
+                 duration: const Duration(seconds: 10),
+               ));
+            }
+          }
 
-          // Generate AI Answer using Gemini
-          final aiAnswer = await geminiService.generateAnswer(queryText);
+          // Generate AI Answer using Gemini in the user's language directly
+          final userLangCode = ref.read(languageProvider) ?? 'en';
+          final userSarvamCode = toSarvamCode(userLangCode);
+          final userLangName = GeminiService.langCodeToName(userLangCode);
+          final aiAnswer = await geminiService.generateAnswer(queryText, language: userLangName);
 
-          // Translate AI Answer to Tamil
-          final sarvam = ref.read(sarvamApiServiceProvider);
-          final tamilAiAnswer = await sarvam.translateText(
-            aiAnswer,
-            sourceLanguage: 'en-IN',
-            targetLanguage: 'ta-IN',
-          );
-
+          // Gemini already responded in the user's language — no translation needed
+          // Show answer + start TTS simultaneously
+          final tts = ref.read(textToSpeechServiceProvider);
           setState(() {
             _isProcessing = false;
             _loadingMessage = null;
             _matchedAnswer = aiAnswer;
-            _tamilAnswer = tamilAiAnswer;
+            _nativeAnswer = aiAnswer;
+            _answerLangCode = userLangCode;
             _isAiAnswer = true;
-            _matchSimilarity = 0; // AI answer, similarity not applicable
+            _matchSimilarity = 0;
           });
-
-          // Speak the AI answer in Tamil
-          final tts = ref.read(textToSpeechServiceProvider);
-          await tts.speak(tamilAiAnswer, language: 'ta-IN');
+          // Fire TTS immediately — audio loads while user reads the answer
+          unawaited(tts.speak(aiAnswer, language: userSarvamCode));
 
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -370,9 +428,13 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
         // Use createKnowledgePost for Sharing (Handles Embeddings)
         await repo.createKnowledgePost(
-          userId: userId,
+          userId: userId ?? '',
           latitude: lat,
           longitude: lng,
+          farmerName: Supabase.instance.client.auth.currentUser?.userMetadata?['full_name'] ?? 'Farmer',
+          location: await repo.getLocationName(lat, lng), // Will need to make this public or implement here
+          crop: 'General',
+          category: 'Crops',
           audioFile: File(_audioPath!),
           manualTranscript: _transcript!,
           translatedText: _translation, 
@@ -416,11 +478,11 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       _translation = null;
       _audioPath = null;
       _matchedAnswer = null;
-      _tamilAnswer = null;
+      _nativeAnswer = null;
       _matchSimilarity = 0;
       _isAiAnswer = false;
       _isProcessing = false;
-      _selectedImage = null; // Reset image
+      _selectedImage = null;
     });
   }
 
@@ -440,7 +502,11 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                 children: [
                    IconButton(
                     icon: const Icon(Icons.close_rounded, size: 28),
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      ref.read(textToSpeechServiceProvider).stop();
+                      _audioPlayer.stop();
+                      context.pop();
+                    },
                   ),
                 ],
               ),
@@ -555,7 +621,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                       // Mic (Center)
                       VoiceRecorderWidget(
                         onResult: _handleVoiceResult,
-                        initialLocale: 'ta_IN',
+                        initialLocale: toSarvamCode(ref.read(languageProvider)),
                       ),
                       
                       const SizedBox(width: 24),
@@ -717,47 +783,50 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                     ],
                                   ),
 
-                                  // Tamil Answer (primary)
-                                  if (_tamilAnswer != null) ...[
-                                    const SizedBox(height: 12),
+                          // Native language Answer (primary)
+                          if (_nativeAnswer != null) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Text('🇮🇳', style: TextStyle(fontSize: 16)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _getLanguageLabel(),
+                                  style: AppTextStyles.labelMedium.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  )),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _nativeAnswer!,
+                              style: AppTextStyles.bodyLarge.copyWith(height: 1.6),
+                            ),
+                          ],
+
+                                  // English Answer (secondary)
+                                  if (!_isAiAnswer) ...[
+                                    const SizedBox(height: 16),
                                     Row(
                                       children: [
-                                        const Text('🇮🇳', style: TextStyle(fontSize: 16)),
+                                        const Text('🌐', style: TextStyle(fontSize: 16)),
                                         const SizedBox(width: 6),
-                                        Text('தமிழ் பதில்', 
+                                        Text('English', 
                                           style: AppTextStyles.labelMedium.copyWith(
                                             fontWeight: FontWeight.w600,
+                                            color: Colors.grey,
                                           )),
                                       ],
                                     ),
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      _tamilAnswer!,
-                                      style: AppTextStyles.bodyLarge.copyWith(height: 1.6),
+                                      _matchedAnswer!,
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                        height: 1.5,
+                                        color: Colors.grey[600],
+                                      ),
                                     ),
                                   ],
-
-                                  // English Answer (secondary)
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      const Text('🌐', style: TextStyle(fontSize: 16)),
-                                      const SizedBox(width: 6),
-                                      Text('English', 
-                                        style: AppTextStyles.labelMedium.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey,
-                                        )),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _matchedAnswer!,
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      height: 1.5,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
 
                                   // Listen Again button
                                   const SizedBox(height: 16),
@@ -765,19 +834,32 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
-                                        if (_matchedAudioUrl != null) {
-                                           await _audioPlayer.stop();
-                                           await _audioPlayer.play(UrlSource(_matchedAudioUrl!));
-                                        } else {
+                                        final userLangCode = ref.read(languageProvider) ?? 'en';
+                                        final userSarvamCode = toSarvamCode(userLangCode);
+                                        if (_isAiAnswer) {
                                           final tts = ref.read(textToSpeechServiceProvider);
-                                          tts.speak(
-                                            _tamilAnswer ?? _matchedAnswer!,
-                                            language: 'ta-IN',
-                                          );
+                                          if (_isTtsPlaying) {
+                                            await tts.stop();
+                                          } else {
+                                            tts.speak(_nativeAnswer ?? _matchedAnswer!, language: userSarvamCode);
+                                          }
+                                        } else {
+                                          if (_matchedAudioUrl != null) {
+                                             await _audioPlayer.stop();
+                                             await _audioPlayer.play(UrlSource(_matchedAudioUrl!));
+                                          } else {
+                                            // Fallback for community answer without audio
+                                            final tts = ref.read(textToSpeechServiceProvider);
+                                            tts.speak(_nativeAnswer ?? _matchedAnswer!, language: userSarvamCode);
+                                          }
                                         }
                                       },
-                                      icon: const Icon(Icons.volume_up_rounded),
-                                      label: Text(_isAiAnswer ? 'Listen AI Answer 🔉' : 'Listen Community Answer 🔊'),
+                                      icon: Icon(_isAiAnswer && _isTtsPlaying ? Icons.stop_circle_rounded : Icons.volume_up_rounded),
+                                      label: Text(
+                                        _isAiAnswer 
+                                          ? (_isTtsPlaying ? 'Stop TTS ⏹' : 'Listen AI Answer 🔉') 
+                                          : 'Listen Community Answer 🔊'
+                                      ),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: _isAiAnswer ? AppColors.primary : AppColors.success,
                                         foregroundColor: Colors.white,
@@ -865,5 +947,29 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
         ),
       ),
     );
+  }
+
+  /// Returns a display label for the user's native language answer section.
+  /// Uses the language code captured when the answer was generated — avoids
+  /// label/content mismatch from provider state changes.
+  String _getLanguageLabel() {
+    final langCode = _answerLangCode ?? _getUserLangCode();
+    final lang = AppConstants.supportedLanguages.firstWhere(
+      (l) => l['code'] == langCode,
+      orElse: () => {'name': 'Answer', 'english': 'Answer'},
+    );
+    return '${lang['english']} Answer';
+  }
+
+  /// Returns the user's language code directly from AuthAuthenticated.language
+  /// (populated from Supabase users table — no Hive race condition).
+  /// Falls back to languageProvider for situations where auth state is unavailable.
+  String _getUserLangCode() {
+    final authState = ref.read(authStateProvider);
+    if (authState is AuthAuthenticated && authState.language != null) {
+      return authState.language!;
+    }
+    // Fallback to Hive-backed provider
+    return ref.read(languageProvider) ?? 'en';
   }
 }

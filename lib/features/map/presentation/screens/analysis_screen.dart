@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_tts/flutter_tts.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -9,6 +9,10 @@ import '../../../auth/domain/models/auth_state.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../map/presentation/providers/map_providers.dart';
 import '../../../../core/providers/service_providers.dart';
+import '../../../../core/providers/language_provider.dart';
+import '../../../../core/services/gemini_service.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AnalysisScreen extends ConsumerStatefulWidget {
   final String originalText;
@@ -33,7 +37,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   Map<String, dynamic>? _matchData;
   String? _aiAnswer;
   
-  final FlutterTts _flutterTts = FlutterTts();
   bool _isPlaying = false;
 
   @override
@@ -43,8 +46,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   }
 
   @override
-  void dispose() {
-    _flutterTts.stop();
+    ref.read(textToSpeechServiceProvider).stop();
     super.dispose();
   }
 
@@ -52,7 +54,18 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     final repo = ref.read(reportRepositoryProvider);
     final gemini = ref.read(geminiServiceProvider);
     final authState = ref.read(authStateProvider);
-    final userId = (authState is AuthAuthenticated) ? authState.userId : 'anon';
+    
+    String? userId;
+    if (authState is AuthAuthenticated) {
+      userId = authState.userId;
+    } else if (authState is AuthProfileIncomplete) {
+      userId = authState.userId;
+    } else {
+      userId = Supabase.instance.client.auth.currentUser?.id;
+    }
+    
+    final farmerProfile = await ref.read(farmerProfileProvider.future);
+    final farmerName = farmerProfile.name;
     
     // 1. Use preloaded matches or search for similar knowledge
     final List<Map<String, dynamic>> matches;
@@ -77,17 +90,21 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       // NO MATCH -> AI FALLBACK
       // 1. Create Question (Async)
       repo.createQuestion(
-        userId: userId, 
+        userId: userId,
+        farmerName: farmerName,
         originalText: widget.originalText,
         englishText: widget.translatedText,
         latitude: 0, // Should be passed ideally
         longitude: 0,
       );
 
-      // 2. Generate AI Answer
-      final aiResponse = await gemini.generateAnswer(widget.translatedText ?? widget.originalText);
-      // Translate back if needed (Assuming Tamil for now as MVP default or user pref)
-      // For now, we show English AI response or simple translation logic
+      // 2. Generate AI Answer in user's language directly
+      final userLangCode = ref.read(languageProvider);
+      final userLangName = GeminiService.langCodeToName(userLangCode);
+      final aiResponse = await gemini.generateAnswer(
+        widget.translatedText ?? widget.originalText,
+        language: userLangName,
+      );
       
       if (mounted) {
         setState(() {
@@ -101,24 +118,21 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   }
 
   Future<void> _speak(String text) async {
-    await _flutterTts.setLanguage("en-IN"); // Default to English/Indian for MVP
-    // If Tamil text is detected, switch (simple check)
-    // In production, use user preference
+    final tts = ref.read(textToSpeechServiceProvider);
+    
+    String lang = "en-IN";
     if (RegExp(r'[\u0B80-\u0BFF]').hasMatch(text)) {
-       await _flutterTts.setLanguage("ta-IN");
+       lang = "ta-IN";
     }
 
-    await _flutterTts.setPitch(1.0);
-    await _flutterTts.speak(text);
     setState(() => _isPlaying = true);
-
-    _flutterTts.setCompletionHandler(() {
-      if (mounted) setState(() => _isPlaying = false);
-    });
+    await tts.speak(text, language: lang);
+    if (mounted) setState(() => _isPlaying = false);
   }
 
   Future<void> _stopSpeaking() async {
-    await _flutterTts.stop();
+    final tts = ref.read(textToSpeechServiceProvider);
+    await tts.stop();
     if (mounted) setState(() => _isPlaying = false);
   }
 

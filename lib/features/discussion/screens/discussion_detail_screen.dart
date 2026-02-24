@@ -329,7 +329,7 @@ class DiscussionDetailScreen extends ConsumerWidget {
               }
 
               return Column(
-                children: solutions.asMap().entries.map((entry) {
+                children: solutions.asMap().entries.map<Widget>((entry) {
                   final index = entry.key;
                   final solution = entry.value;
                   return SolutionCard(

@@ -22,6 +22,7 @@ class AuthAuthenticated extends AuthState {
   final String? avatarUrl;
   final String? city;
   final String role; // 'farmer', 'expert', 'admin'
+  final String? language; // Language code e.g. 'ta', 'en', 'hi' from users table
 
   const AuthAuthenticated({
     required this.userId,
@@ -30,6 +31,7 @@ class AuthAuthenticated extends AuthState {
     this.avatarUrl,
     this.city,
     this.role = 'farmer',
+    this.language,
   });
 }
 
@@ -42,12 +44,14 @@ class AuthUnauthenticated extends AuthState {
 class AuthProfileIncomplete extends AuthState {
   final String userId;
   final String email;
+  final String? phoneNumber;
   final String? displayName;
   final String? avatarUrl;
 
   const AuthProfileIncomplete({
     required this.userId,
     required this.email,
+    this.phoneNumber,
     this.displayName,
     this.avatarUrl,
   });

@@ -7,7 +7,7 @@ class SpeechService {
 
   SpeechService(this._sarvamService);
 
-  Future<SarvamProcessResponse> processAudio(String filePath) async {
-    return await _sarvamService.processAudio(filePath);
+  Future<SarvamProcessResponse> processAudio(String filePath, {String sourceLanguage = 'ta-IN'}) async {
+    return await _sarvamService.processAudio(filePath, sourceLanguage: sourceLanguage);
   }
 }

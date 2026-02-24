@@ -18,15 +18,23 @@ class VoiceService {
     }
   }
 
-  /// Starts recording to a temporary file.
+  /// Starts recording to a temporary file in WAV format (optimal for Sarvam STT).
   Future<void> startRecording() async {
     try {
       if (await _audioRecorder.hasPermission()) {
         final tempDir = await getTemporaryDirectory();
-        final filePath = '${tempDir.path}/temp_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        // Use .wav extension — Sarvam STT returns native script reliably with WAV (16kHz mono PCM)
+        final filePath = '${tempDir.path}/temp_audio_${DateTime.now().millisecondsSinceEpoch}.wav';
         
-        // Start recording to file
-        await _audioRecorder.start(const RecordConfig(), path: filePath);
+        await _audioRecorder.start(
+          const RecordConfig(
+            encoder: AudioEncoder.wav,    // PCM WAV — understood by Sarvam STT
+            sampleRate: 16000,            // 16 kHz — Sarvam STT optimal
+            numChannels: 1,               // Mono
+            bitRate: 256000,
+          ),
+          path: filePath,
+        );
         _isRecording = true;
         debugPrint('Started recording to $filePath');
       }

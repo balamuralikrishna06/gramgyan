@@ -8,6 +8,7 @@ import '../../../discussion/providers/discussion_providers.dart';
 import '../../../discussion/widgets/question_card.dart';
 import '../../domain/models/knowledge_post.dart';
 import '../providers/knowledge_providers.dart';
+import '../providers/notification_providers.dart';
 import '../../../../shared/widgets/knowledge_card.dart';
 import '../../../../shared/widgets/filter_chip_bar.dart';
 import '../../../../shared/widgets/shimmer_card.dart';
@@ -24,6 +25,7 @@ class HomeScreen extends ConsumerWidget {
     final postsAsync = ref.watch(knowledgePostsProvider);
     final questionsAsync = ref.watch(questionsProvider);
     final filter = ref.watch(selectedCategoryProvider);
+    final unreadCountAsync = ref.watch(unreadNotificationsCountProvider);
     final authState = ref.watch(authStateProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -67,8 +69,8 @@ class HomeScreen extends ConsumerWidget {
                 _IconBtn(
                   icon: Icons.notifications_none_rounded,
                   isDark: isDark,
-                  badgeCount: 3,
-                  onTap: () {},
+                  badgeCount: unreadCountAsync.valueOrNull ?? 0,
+                  onTap: () => context.push('/notifications'),
                 ),
                 const SizedBox(width: 8),
                 Container(

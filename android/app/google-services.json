@@ -1,0 +1,38 @@
+{
+  "project_info": {
+    "project_number": "672697115015",
+    "project_id": "gramgyan-c1136",
+    "storage_bucket": "gramgyan-c1136.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:672697115015:android:41400fa2e6c226e3d5b322",
+        "android_client_info": {
+          "package_name": "com.gramgyan"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "672697115015-chrfghvp2nfis83d67t5ddc1luj3kiqv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gramgyan",
+            "certificate_hash": "bf31897b81bc764aac90c768892cf710ed731445"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDWzRCXQlbMTHXNfbXMHFhtNcQq1FirasU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
