@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../discussion/providers/discussion_providers.dart';
+import '../../../discussion/models/question.dart';
 import '../../../discussion/widgets/question_card.dart';
 import '../../domain/models/knowledge_post.dart';
 import '../providers/knowledge_providers.dart';
@@ -35,7 +36,7 @@ class HomeScreen extends ConsumerWidget {
     final userInitials = userName.isNotEmpty ? userName[0].toUpperCase() : 'F';
 
     // Show questions feed for discussion-type filters
-    final showDiscussion = ['Questions', 'Solved', 'Verified'].contains(filter);
+    final showDiscussion = ['Questions', 'Solved'].contains(filter);
 
     return SafeArea(
       child: Column(
@@ -141,13 +142,94 @@ class HomeScreen extends ConsumerWidget {
                 ref.invalidate(questionsProvider);
                 await Future.delayed(const Duration(milliseconds: 500));
               },
-              child: showDiscussion
-                  ? _buildQuestionsFeed(questionsAsync, ref)
-                  : _buildKnowledgeFeed(postsAsync, context),
+              child: filter == 'All'
+                  ? _buildCombinedFeed(questionsAsync, postsAsync, ref, context)
+                  : showDiscussion
+                      ? _buildQuestionsFeed(questionsAsync, ref)
+                      : _buildKnowledgeFeed(postsAsync, context),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCombinedFeed(
+    AsyncValue questionsAsync,
+    AsyncValue<List<KnowledgePost>> postsAsync,
+    WidgetRef ref,
+    BuildContext context,
+  ) {
+    if (questionsAsync.isLoading || postsAsync.isLoading) {
+      return ListView.builder(
+        padding: const EdgeInsets.only(bottom: 100),
+        itemCount: 4,
+        itemBuilder: (_, __) => const ShimmerCard(),
+      );
+    }
+
+    if (questionsAsync.hasError || postsAsync.hasError) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off_rounded,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+              const SizedBox(height: 12),
+              Text('Something went wrong',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  )),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final questions = (questionsAsync.valueOrNull as List?)?.cast<Question>() ?? [];
+    final posts = postsAsync.valueOrNull ?? [];
+
+    if (questions.isEmpty && posts.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('🚀', style: TextStyle(fontSize: 48)),
+              const SizedBox(height: 12),
+              Text('Nothing here yet',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  )),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Combine and sort by date descending
+    final combined = [...questions, ...posts];
+    combined.sort((a, b) {
+      final aDate = a is Question ? a.createdAt : (a as KnowledgePost).createdAt;
+      final bDate = b is Question ? b.createdAt : (b as KnowledgePost).createdAt;
+      return bDate.compareTo(aDate);
+    });
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 100),
+      itemCount: combined.length,
+      itemBuilder: (_, i) {
+        final item = combined[i];
+        if (item is Question) {
+          return QuestionCard(question: item);
+        } else {
+          return KnowledgeCard(post: item as KnowledgePost);
+        }
+      },
     );
   }
 

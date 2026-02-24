@@ -103,6 +103,12 @@ class Question {
   }
 
   factory Question.fromJson(Map<String, dynamic> json) {
+    final parsedReplyCount = json['reply_count'] as int? ?? json['replyCount'] as int? ?? 0;
+    var parsedStatus = QuestionStatus.fromString(json['status'] as String? ?? 'open');
+    if (parsedStatus == QuestionStatus.open && parsedReplyCount > 0) {
+      parsedStatus = QuestionStatus.solved;
+    }
+
     return Question(
       id: json['id'] as String,
       authorId: json['user_id'] as String? ?? json['authorId'] as String? ?? 'unknown',
@@ -113,8 +119,8 @@ class Question {
       transcript: json['original_text'] as String? ?? json['transcript'] as String? ?? '',
       englishText: json['english_text'] as String?,
       audioUrl: json['audio_url'] as String? ?? json['audioUrl'] as String? ?? '',
-      status: QuestionStatus.fromString(json['status'] as String? ?? 'open'),
-      replyCount: json['reply_count'] as int? ?? json['replyCount'] as int? ?? 0,
+      status: parsedStatus,
+      replyCount: parsedReplyCount,
       karma: json['karma'] as int? ?? 0,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)

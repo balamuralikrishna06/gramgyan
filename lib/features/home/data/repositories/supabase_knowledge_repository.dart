@@ -29,7 +29,7 @@ class SupabaseKnowledgeRepository {
 
   /// Fetch posts filtered by category.
   Future<List<KnowledgePost>> fetchPostsByCategory(String category) async {
-    if (category == 'All') {
+    if (category == 'All' || category == 'Verified') {
       return fetchPosts();
     }
 
