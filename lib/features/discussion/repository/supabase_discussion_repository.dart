@@ -105,8 +105,21 @@ class SupabaseDiscussionRepository {
         'q_id': questionId,
       });
     } catch (e) {
-      // Non-blocking: just increment locally
-      debugPrint('Could not increment reply count: $e');
+      debugPrint('RPC increment_reply_count failed, trying direct update: $e');
+      try {
+        final current = await _client
+            .from('questions')
+            .select('reply_count')
+            .eq('id', questionId)
+            .single();
+        final currentCount = current['reply_count'] as int? ?? 0;
+        await _client
+            .from('questions')
+            .update({'reply_count': currentCount + 1})
+            .eq('id', questionId);
+      } catch (e2) {
+        debugPrint('Direct reply count update also failed: $e2');
+      }
     }
 
     return Solution.fromJson(response);
