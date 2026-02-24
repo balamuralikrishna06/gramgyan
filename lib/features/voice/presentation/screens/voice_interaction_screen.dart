@@ -355,11 +355,14 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           final audioUrl = matchData['audio_url'] as String?;
           if (audioUrl != null && audioUrl.isNotEmpty) {
             debugPrint('Playing original audio for solution: $audioUrl');
-            await _audioPlayer.stop();
-            await _audioPlayer.play(UrlSource(audioUrl));
             setState(() {
               _matchedAudioUrl = audioUrl;
             });
+            unawaited(_audioPlayer.stop().then((_) {
+              return _audioPlayer.play(UrlSource(audioUrl));
+            }).catchError((e) {
+              debugPrint('Failed to auto-play original audio: $e');
+            }));
           } else {
              debugPrint('No original audio, using TTS.');
              final tts = ref.read(textToSpeechServiceProvider);
@@ -367,6 +370,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
              unawaited(tts.speak(nativeAnswer, language: userSarvamCode));
              setState(() => _matchedAudioUrl = null);
           }
+
 
         } else {
           // ❌ NO MATCH → Post to Community + Get AI Answer
@@ -859,8 +863,8 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                         icon: Icon(_isTtsPlaying ? Icons.stop_circle_rounded : Icons.volume_up_rounded),
                                         label: Text(
                                           _isTtsPlaying 
-                                            ? 'Stop Audio ⏹' 
-                                            : (_isAiAnswer ? 'Listen AI Answer 🔉' : 'Listen Community Answer 🔊')
+                                            ? 'Stop' 
+                                            : (_isAiAnswer ? 'Listen AI Answer' : 'Listen Community Answer')
                                         ),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: _isAiAnswer ? AppColors.primary : AppColors.success,
@@ -885,7 +889,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                             },
                                             icon: Icon(_isAudioPlaying ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded),
                                             label: Text(
-                                              _isAudioPlaying ? 'Stop ⏹' : 'Original',
+                                              _isAudioPlaying ? 'Stop' : 'Original',
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                             style: ElevatedButton.styleFrom(
@@ -911,7 +915,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                                             },
                                             icon: Icon(_isTtsPlaying ? Icons.stop_circle_rounded : Icons.volume_up_rounded),
                                             label: Text(
-                                              _isTtsPlaying ? 'Stop ⏹' : _getLanguageLabel(),
+                                              _isTtsPlaying ? 'Stop' : _getLanguageLabel(),
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                             style: ElevatedButton.styleFrom(
