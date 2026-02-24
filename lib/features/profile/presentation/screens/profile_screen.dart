@@ -250,7 +250,7 @@ class ProfileScreen extends ConsumerWidget {
               trailing: Icon(Icons.arrow_forward_ios_rounded,
                   size: 14,
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
-              onTap: () {},
+              onTap: () => _showLanguagePicker(context, ref, profile.language, brightness),
             ),
             const SizedBox(height: 10),
 
@@ -262,7 +262,7 @@ class ProfileScreen extends ConsumerWidget {
               trailing: Icon(Icons.arrow_forward_ios_rounded,
                   size: 14,
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
-              onTap: () {},
+              onTap: () => _showAboutBottomSheet(context, brightness),
             ),
             const SizedBox(height: 8),
             // ── Logout ──
@@ -291,6 +291,226 @@ class ProfileScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _showLanguagePicker(BuildContext context, WidgetRef ref, String currentLanguage, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.cardDark : AppColors.cardLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Select Language',
+                    style: AppTextStyles.titleLarge.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...AppConstants.supportedLanguages.map((lang) {
+                  final theme = Theme.of(context);
+                  final isSelected = lang['english'] == currentLanguage;
+                  return ListTile(
+                    leading: Text(lang['icon']!, style: const TextStyle(fontSize: 24)),
+                    title: Text(
+                      lang['name']!,
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                    subtitle: Text(
+                      lang['english']!,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    trailing: isSelected 
+                        ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                        : null,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      if (!isSelected) {
+                        try {
+                          await ref.read(profileControllerProvider).updateLanguage(lang['english']!);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Language changed to ${lang['english']}'),
+                                backgroundColor: AppColors.success,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Failed to update language'),
+                                backgroundColor: AppColors.error,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      }
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAboutBottomSheet(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.cardDark : AppColors.cardLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 24,
+              bottom: 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.cardGreenDark : AppColors.cardGreenLight,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.info_outline_rounded,
+                            color: isDark ? AppColors.primaryLight : AppColors.primary, size: 28),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        'About GramGyan',
+                        style: AppTextStyles.headlineSmall.copyWith(
+                          color: Theme.of(sheetContext).colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Vision',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: isDark ? AppColors.primaryLight : AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Gramgyan is an AI-powered, community-driven platform designed to bridge the information gap in Indian agriculture. We believe that language and literacy should never be a barrier to modern farming knowledge.',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: Theme.of(sheetContext).colorScheme.onSurface,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Key Features',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: isDark ? AppColors.primaryLight : AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFeatureItem(
+                    sheetContext,
+                    isDark: isDark,
+                    title: 'Audio-First Interaction:',
+                    description: 'Ask questions in your local language—no typing required.',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFeatureItem(
+                    sheetContext,
+                    isDark: isDark,
+                    title: 'Instant AI Guidance:',
+                    description: 'Get immediate, AI-labeled answers powered by Google Gemini to address urgent field issues.',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFeatureItem(
+                    sheetContext,
+                    isDark: isDark,
+                    title: 'Community Wisdom:',
+                    description: 'Connect with a network of experienced farmers and agricultural experts for human-verified solutions.',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFeatureItem(
+                    sheetContext,
+                    isDark: isDark,
+                    title: 'Verified Knowledge:',
+                    description: 'Every community answer undergoes admin approval to ensure the highest standards of accuracy and safety.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFeatureItem(BuildContext context, {required bool isDark, required String title, required String description}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 6.0, right: 8.0, left: 4.0),
+          child: Icon(
+            Icons.circle,
+            size: 6,
+            color: isDark ? AppColors.primaryLight : AppColors.primary,
+          ),
+        ),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+                height: 1.5,
+              ),
+              children: [
+                TextSpan(
+                  text: '$title ',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                TextSpan(text: description),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

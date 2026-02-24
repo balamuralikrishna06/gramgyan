@@ -71,3 +71,29 @@ final farmerProfileProvider = FutureProvider<FarmerProfile>((ref) async {
     avatarUrl: user.photoURL ?? '',
   );
 });
+
+final profileControllerProvider = Provider<ProfileController>((ref) {
+  return ProfileController(ref);
+});
+
+class ProfileController {
+  final Ref _ref;
+  ProfileController(this._ref);
+
+  Future<void> updateLanguage(String newLanguage) async {
+    final user = _ref.read(authRepositoryProvider).currentUser;
+    if (user == null) return;
+
+    try {
+      await Supabase.instance.client
+          .from('users')
+          .update({'language': newLanguage})
+          .eq('id', user.uid);
+      
+      // Invalidate the profile provider to reflect changes
+      _ref.invalidate(farmerProfileProvider);
+    } catch (e) {
+      throw Exception('Failed to update language: $e');
+    }
+  }
+}
