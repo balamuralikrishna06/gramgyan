@@ -50,6 +50,10 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
   String? _matchedAudioUrl;
   final AudioPlayer _audioPlayer = AudioPlayer();
   
+  // Audio State
+  StreamSubscription<PlayerState>? _audioSubscription;
+  bool _isAudioPlaying = false;
+  
   // TTS State
   StreamSubscription<PlayerState>? _ttsSubscription;
   bool _isTtsPlaying = false;
@@ -65,12 +69,16 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       _ttsSubscription = ref.read(textToSpeechServiceProvider).onPlayerStateChanged.listen((state) {
         if (mounted) setState(() => _isTtsPlaying = state == PlayerState.playing);
       });
+      _audioSubscription = _audioPlayer.onPlayerStateChanged.listen((state) {
+        if (mounted) setState(() => _isAudioPlaying = state == PlayerState.playing);
+      });
     });
   }
 
   @override
   void dispose() {
     _ttsSubscription?.cancel();
+    _audioSubscription?.cancel();
     ref.read(textToSpeechServiceProvider).stop();
     _audioPlayer.dispose();
     super.dispose();
@@ -830,45 +838,92 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
 
                                   // Listen Again button
                                   const SizedBox(height: 16),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () async {
-                                        final userLangCode = ref.read(languageProvider) ?? 'en';
-                                        final userSarvamCode = toSarvamCode(userLangCode);
-                                        if (_isAiAnswer) {
+                                  // Action Buttons
+                                  const SizedBox(height: 16),
+                                  if (_isAiAnswer || _matchedAudioUrl == null) ...[
+                                    // Single TTS Button
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () async {
+                                          final userLangCode = ref.read(languageProvider) ?? 'en';
+                                          final userSarvamCode = toSarvamCode(userLangCode);
                                           final tts = ref.read(textToSpeechServiceProvider);
                                           if (_isTtsPlaying) {
                                             await tts.stop();
                                           } else {
+                                            await _audioPlayer.stop(); // Stop original audio if playing
                                             tts.speak(_nativeAnswer ?? _matchedAnswer!, language: userSarvamCode);
                                           }
-                                        } else {
-                                          if (_matchedAudioUrl != null) {
-                                             await _audioPlayer.stop();
-                                             await _audioPlayer.play(UrlSource(_matchedAudioUrl!));
-                                          } else {
-                                            // Fallback for community answer without audio
-                                            final tts = ref.read(textToSpeechServiceProvider);
-                                            tts.speak(_nativeAnswer ?? _matchedAnswer!, language: userSarvamCode);
-                                          }
-                                        }
-                                      },
-                                      icon: Icon(_isAiAnswer && _isTtsPlaying ? Icons.stop_circle_rounded : Icons.volume_up_rounded),
-                                      label: Text(
-                                        _isAiAnswer 
-                                          ? (_isTtsPlaying ? 'Stop TTS ⏹' : 'Listen AI Answer 🔉') 
-                                          : 'Listen Community Answer 🔊'
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: _isAiAnswer ? AppColors.primary : AppColors.success,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                        },
+                                        icon: Icon(_isTtsPlaying ? Icons.stop_circle_rounded : Icons.volume_up_rounded),
+                                        label: Text(
+                                          _isTtsPlaying 
+                                            ? 'Stop Audio ⏹' 
+                                            : (_isAiAnswer ? 'Listen AI Answer 🔉' : 'Listen Community Answer 🔊')
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: _isAiAnswer ? AppColors.primary : AppColors.success,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                         ),
                                       ),
                                     ),
-                                  ),
+                                  ] else ...[
+                                    // Two Buttons (Original Audio & TTS)
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            onPressed: () async {
+                                              if (_isAudioPlaying) {
+                                                await _audioPlayer.stop();
+                                              } else {
+                                                await ref.read(textToSpeechServiceProvider).stop();
+                                                await _audioPlayer.play(UrlSource(_matchedAudioUrl!));
+                                              }
+                                            },
+                                            icon: Icon(_isAudioPlaying ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded),
+                                            label: Text(
+                                              _isAudioPlaying ? 'Stop ⏹' : 'Original',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: isDark ? AppColors.surfaceDark : Colors.grey[800],
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            onPressed: () async {
+                                              final userLangCode = ref.read(languageProvider) ?? 'en';
+                                              final userSarvamCode = toSarvamCode(userLangCode);
+                                              final tts = ref.read(textToSpeechServiceProvider);
+                                              if (_isTtsPlaying) {
+                                                await tts.stop();
+                                              } else {
+                                                await _audioPlayer.stop();
+                                                tts.speak(_nativeAnswer ?? _matchedAnswer!, language: userSarvamCode);
+                                              }
+                                            },
+                                            icon: Icon(_isTtsPlaying ? Icons.stop_circle_rounded : Icons.volume_up_rounded),
+                                            label: Text(
+                                              _isTtsPlaying ? 'Stop ⏹' : _getLanguageLabel(),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.success,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                   if (_isAiAnswer) ...[
                                     const SizedBox(height: 12),
                                     Text('• Question posted to community for verification', 
