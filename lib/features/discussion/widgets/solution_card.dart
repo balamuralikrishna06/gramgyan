@@ -192,7 +192,7 @@ class _SolutionCardState extends ConsumerState<SolutionCard> {
                   Expanded(
                     child: Row(
                       children: [
-                        Flexible(
+                        Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () async {
                               if (_isAudioPlaying) {
@@ -216,7 +216,7 @@ class _SolutionCardState extends ConsumerState<SolutionCard> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Flexible(
+                        Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () async {
                               final userLangCode = ref.read(languageProvider) ?? 'en';
@@ -312,7 +312,7 @@ class _SolutionCardState extends ConsumerState<SolutionCard> {
                     ),
                   ),
                 ],
-                const Spacer(),
+                const SizedBox(width: 8),
                 // Upvote button
                 GestureDetector(
                   onTap: () {

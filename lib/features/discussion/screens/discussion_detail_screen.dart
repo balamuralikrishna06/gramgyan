@@ -1,9 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/providers/service_providers.dart';
+import '../../../core/providers/language_provider.dart';
+import '../../../core/constants/app_constants.dart';
 import '../models/question.dart';
 import '../providers/discussion_providers.dart';
 import '../widgets/solution_card.dart';
@@ -81,11 +86,24 @@ class DiscussionDetailScreen extends ConsumerWidget {
       ),
 
       // ── Floating Add Solution Button ──
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'add_solution_fab',
-        onPressed: () => context.push('/add-solution/$questionId'),
-        icon: const Icon(Icons.reply_rounded),
-        label: const Text('Add Solution'),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed: () => context.push('/add-solution/$questionId'),
+            icon: const Icon(Icons.reply_rounded),
+            label: const Text('Add Solution', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 4,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -110,127 +128,7 @@ class DiscussionDetailScreen extends ConsumerWidget {
         padding: const EdgeInsets.only(bottom: 90),
         children: [
           // ── Question Card ──
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : AppColors.cardLight,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark ? AppColors.dividerDark : AppColors.divider,
-                width: 0.5,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Status + Crop
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        question.crop,
-                        style: AppTextStyles.headlineSmall.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                    _StatusBadge(status: question.status),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // Info rows
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.cardGreenDark
-                        : AppColors.cardGreenLight,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    children: [
-                      _InfoRow(
-                        icon: Icons.person_outline_rounded,
-                        label: 'Farmer',
-                        value: question.farmerName,
-                        isDark: isDark,
-                      ),
-                      const SizedBox(height: 8),
-                      _InfoRow(
-                        icon: Icons.location_on_outlined,
-                        label: 'Location',
-                        value: question.location,
-                        isDark: isDark,
-                      ),
-                      const SizedBox(height: 8),
-                      _InfoRow(
-                        icon: Icons.category_outlined,
-                        label: 'Category',
-                        value: question.category,
-                        isDark: isDark,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Transcript
-                Text(
-                  question.transcript,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.6,
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Play button
-                GestureDetector(
-                  onTap: () {
-                    ref.read(discussionPlayingIdProvider.notifier).state =
-                        isPlaying ? null : question.id;
-                  },
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppColors.cardGreenDark
-                          : AppColors.cardGreenLight,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isPlaying
-                              ? Icons.stop_rounded
-                              : Icons.play_arrow_rounded,
-                          size: 20,
-                          color: isDark
-                              ? AppColors.primaryLight
-                              : AppColors.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          isPlaying ? 'Stop' : 'Play Audio',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            color: isDark
-                                ? AppColors.primaryLight
-                                : AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _QuestionCard(question: question, isDark: isDark),
 
           const SizedBox(height: 8),
 
@@ -426,6 +324,224 @@ class _InfoRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Question Card (Stateful for Audio) ──
+class _QuestionCard extends ConsumerStatefulWidget {
+  final Question question;
+  final bool isDark;
+
+  const _QuestionCard({required this.question, required this.isDark});
+
+  @override
+  ConsumerState<_QuestionCard> createState() => _QuestionCardState();
+}
+
+class _QuestionCardState extends ConsumerState<_QuestionCard> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  StreamSubscription<PlayerState>? _audioSubscription;
+  bool _isAudioPlaying = false;
+
+  StreamSubscription<PlayerState>? _ttsSubscription;
+  bool _isTtsPlaying = false;
+  
+  bool _isTranslating = false;
+  String? _translatedText;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      _ttsSubscription = ref.read(textToSpeechServiceProvider).onPlayerStateChanged.listen((state) {
+        if (mounted) setState(() => _isTtsPlaying = state == PlayerState.playing);
+      });
+      _audioSubscription = _audioPlayer.onPlayerStateChanged.listen((state) {
+        if (mounted) setState(() => _isAudioPlaying = state == PlayerState.playing);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _ttsSubscription?.cancel();
+    _audioSubscription?.cancel();
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  String _getLanguageLabel() {
+    final langCode = ref.read(languageProvider) ?? 'en';
+    final lang = AppConstants.supportedLanguages.firstWhere(
+      (l) => l['code'] == langCode,
+      orElse: () => {'english': 'Audio'},
+    );
+    return '${lang['english']}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: widget.isDark ? AppColors.cardDark : AppColors.cardLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: widget.isDark ? AppColors.dividerDark : AppColors.divider,
+          width: 0.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Status + Crop
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.question.crop,
+                  style: AppTextStyles.headlineSmall.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              _StatusBadge(status: widget.question.status),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Info rows
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: widget.isDark
+                  ? AppColors.cardGreenDark
+                  : AppColors.cardGreenLight,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              children: [
+                _InfoRow(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Farmer',
+                  value: widget.question.farmerName,
+                  isDark: widget.isDark,
+                ),
+                const SizedBox(height: 8),
+                _InfoRow(
+                  icon: Icons.location_on_outlined,
+                  label: 'Location',
+                  value: widget.question.location,
+                  isDark: widget.isDark,
+                ),
+                const SizedBox(height: 8),
+                _InfoRow(
+                  icon: Icons.category_outlined,
+                  label: 'Category',
+                  value: widget.question.category,
+                  isDark: widget.isDark,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Transcript
+          Text(
+            widget.question.transcript,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Audio Action Buttons
+          Row(
+            children: [
+              if (widget.question.audioUrl.isNotEmpty) ...[
+                // Two Buttons (Original Audio & TTS)
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      if (_isAudioPlaying) {
+                        await _audioPlayer.stop();
+                      } else {
+                        await ref.read(textToSpeechServiceProvider).stop();
+                        await _audioPlayer.play(UrlSource(widget.question.audioUrl));
+                      }
+                    },
+                    icon: Icon(_isAudioPlaying ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded, size: 18),
+                    label: Text(
+                      _isAudioPlaying ? 'Stop' : 'Original',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: widget.isDark ? AppColors.surfaceDark : Colors.grey[800],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              
+              // TTS Button
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final userLangCode = ref.read(languageProvider) ?? 'en';
+                    final userSarvamCode = toSarvamCode(userLangCode);
+                    final tts = ref.read(textToSpeechServiceProvider);
+                    if (_isTtsPlaying) {
+                      await tts.stop();
+                    } else if (!_isTranslating) {
+                      await _audioPlayer.stop();
+                      if (_translatedText == null && userSarvamCode != 'en-IN') {
+                        setState(() => _isTranslating = true);
+                        try {
+                          final sarvam = ref.read(sarvamApiServiceProvider);
+                          _translatedText = await sarvam.translateText(
+                            widget.question.transcript,
+                            sourceLanguage: 'en-IN',
+                            targetLanguage: userSarvamCode,
+                          );
+                        } catch (e) {
+                          debugPrint('Translation error: $e');
+                          _translatedText = widget.question.transcript;
+                        } finally {
+                          if (mounted) setState(() => _isTranslating = false);
+                        }
+                      }
+                      tts.speak(_translatedText ?? widget.question.transcript, language: userSarvamCode);
+                    }
+                  },
+                  icon: _isTranslating 
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Icon(_isTtsPlaying ? Icons.stop_circle_rounded : Icons.volume_up_rounded, size: 18),
+                  label: Text(
+                    _isTranslating ? '...' : (_isTtsPlaying ? 'Stop' : _getLanguageLabel()),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: widget.isDark ? AppColors.cardGreenDark : AppColors.cardGreenLight,
+                    foregroundColor: widget.isDark ? AppColors.primaryLight : AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              if (widget.question.audioUrl.isEmpty) const Spacer(), // Pad out if only one button
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
