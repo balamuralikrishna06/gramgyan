@@ -300,7 +300,7 @@ class ReportRepository {
     try {
       final response = await _client
           .from('knowledge_submissions')
-          .select('*, questions(original_text, english_text)')
+          .select('*, questions(original_text, english_text), users(language)')
           .eq('moderation_status', 'pending')
           .order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
