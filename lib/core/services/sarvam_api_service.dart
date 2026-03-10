@@ -32,7 +32,6 @@ class SarvamProcessResponse {
 class SarvamApiService {
   // Use Render Production URL from Constants
   static const String _baseUrl = '${AppConstants.backendUrl}api/v1/speech';
-  static const String _sarvamTtsUrl = 'https://api.sarvam.ai/text-to-speech';
 
   final AudioPlayer _audioPlayer = AudioPlayer();
 
@@ -68,39 +67,28 @@ class SarvamApiService {
     }
   }
 
-  /// Converts text to speech using Sarvam AI TTS (Bulbul v2).
+  /// Converts text to speech using the Render Backend.
   /// Returns the path to the generated audio file.
   Future<String?> textToSpeech(String text, {String languageCode = 'ta-IN'}) async {
     try {
-      debugPrint('Sarvam TTS: Converting text (${text.length} chars) to speech in $languageCode...');
-      debugPrint('Sarvam TTS: Text = "$text"');
+      debugPrint('Sarvam TTS via Backend: Converting text (${text.length} chars) to speech in $languageCode...');
       
-      // Clean the API key (remove any prefix like 'sarvam ')
-      final apiKey = AppConstants.sarvamApiKey.trim();
-      debugPrint('Sarvam TTS: Using API key starting with: ${apiKey.substring(0, 10)}...');
-
       final response = await http.post(
-        Uri.parse(_sarvamTtsUrl),
+        Uri.parse('$_baseUrl/speak'),
         headers: {
           'Content-Type': 'application/json',
-          'api-subscription-key': apiKey,
         },
         body: jsonEncode({
-          'inputs': [text],
-          'target_language_code': languageCode,
-          'speaker': 'meera',
-          'model': 'bulbul:v2',
+          'text': text,
+          'language_code': languageCode,
         }),
       );
 
       if (response.statusCode == 200) {
-        final jsonData = jsonDecode(response.body);
-        final List<dynamic> audios = jsonData['audios'];
+        final audioBytes = response.bodyBytes;
         
-        if (audios.isNotEmpty) {
-          // Decode base64 audio
-          final audioBytes = base64Decode(audios[0] as String);
-          debugPrint('Sarvam TTS: Decoded ${audioBytes.length} bytes of audio');
+        if (audioBytes.isNotEmpty) {
+          debugPrint('Sarvam TTS: Received ${audioBytes.length} bytes of audio from Backend');
           
           // Save to temp file
           final tempDir = await getTemporaryDirectory();
@@ -110,14 +98,14 @@ class SarvamApiService {
           debugPrint('Sarvam TTS: Audio saved to ${audioFile.path}');
           return audioFile.path;
         } else {
-          debugPrint('Sarvam TTS: No audios in response');
+          debugPrint('Sarvam TTS: Empty audio response from Backend');
         }
       } else {
-        debugPrint('Sarvam TTS Error: ${response.statusCode}');
-        debugPrint('Sarvam TTS Error Body: ${response.body}');
+        debugPrint('Sarvam TTS Backend Error: ${response.statusCode}');
+        debugPrint('Sarvam TTS Backend Error Body: ${response.body}');
       }
     } catch (e) {
-      debugPrint('Sarvam TTS Error: $e');
+      debugPrint('Sarvam TTS Backend Error: $e');
     }
     return null;
   }
@@ -138,42 +126,43 @@ class SarvamApiService {
     await _audioPlayer.stop();
   }
 
-  /// Translates text using Sarvam AI Translate API (mayura:v1).
+  /// Translates text using the Render Backend.
   /// Supports English ↔ Tamil and other Indian languages.
   Future<String> translateText(String text, {
     String sourceLanguage = 'en-IN',
     String targetLanguage = 'ta-IN',
   }) async {
     try {
-      debugPrint('Sarvam Translate: $sourceLanguage → $targetLanguage (${text.length} chars)');
+      debugPrint('Sarvam Translate via Backend: $sourceLanguage → $targetLanguage (${text.length} chars)');
       
-      final apiKey = AppConstants.sarvamApiKey.trim();
       final response = await http.post(
-        Uri.parse('https://api.sarvam.ai/translate'),
+        Uri.parse('$_baseUrl/translate'),
         headers: {
           'Content-Type': 'application/json',
-          'api-subscription-key': apiKey,
         },
         body: jsonEncode({
-          'input': text,
-          'source_language_code': sourceLanguage,
-          'target_language_code': targetLanguage,
-          'model': 'mayura:v1',
-          'mode': 'classic-colloquial',
+          'text': text,
+          'source_language': sourceLanguage,
+          'target_language': targetLanguage,
         }),
       );
 
       if (response.statusCode == 200) {
-        final jsonData = jsonDecode(utf8.decode(response.bodyBytes));
-        final translated = jsonData['translated_text'] as String? ?? text;
-        debugPrint('Sarvam Translate: Success → "$translated"');
-        return translated;
+        try {
+          final jsonData = jsonDecode(utf8.decode(response.bodyBytes));
+          final translated = jsonData['translated_text'] as String? ?? text;
+          debugPrint('Sarvam Translate Backend: Success → "$translated"');
+          return translated;
+        } catch (_) {
+          // If response fails to decode or unexpected format
+          return text;
+        }
       } else {
-        debugPrint('Sarvam Translate Error: ${response.statusCode} - ${response.body}');
+        debugPrint('Sarvam Translate Backend Error: ${response.statusCode} - ${response.body}');
         return text; // Fallback to original
       }
     } catch (e) {
-      debugPrint('Sarvam Translate Error: $e');
+      debugPrint('Sarvam Translate Backend Error: $e');
       return text; // Fallback to original
     }
   }
