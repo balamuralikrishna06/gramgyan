@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/service_providers.dart';
 import '../../../../core/services/text_to_speech_service.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
 
 class SubmissionCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> submission;
@@ -85,42 +86,37 @@ class _SubmissionCardState extends ConsumerState<SubmissionCard> {
     if (mounted) setState(() => _isTtsLoading = true);
 
     try {
-      final currentAppLang = ref.read(languageProvider) ?? 'en';
-      final targetSarvamCode = toSarvamCode(currentAppLang);
+      // Get the language from the database profile instead of just local app state.
+      // This matches the "language field in users table" request.
+      final profile = ref.read(farmerProfileProvider).valueOrNull;
+      
+      String targetLangCode = 'ta'; // Default fallback
+      if (profile != null && profile.language.isNotEmpty) {
+        targetLangCode = profile.language.toLowerCase();
+      } else {
+        targetLangCode = ref.read(languageProvider) ?? 'en';
+      }
+      
+      // Map semantic name to short code if needed
+      if (targetLangCode == 'tamil') targetLangCode = 'ta';
+      if (targetLangCode == 'english') targetLangCode = 'en';
+      if (targetLangCode == 'hindi') targetLangCode = 'hi';
+      if (targetLangCode == 'telugu') targetLangCode = 'te';
+
+      final targetSarvamCode = toSarvamCode(targetLangCode);
       
       String textToPlay = originalText;
       
-      // If the admin's language is English, just play the English text.
-      if (currentAppLang == 'en' && englishText != null && englishText.isNotEmpty) {
-         textToPlay = englishText;
-      } 
-      // If the admin's language matches the original submitter's language, play original text.
-      else if (submitterLang.toLowerCase() == currentAppLang.toLowerCase() || 
-               submitterLang.toLowerCase().startsWith(currentAppLang)) {
-         textToPlay = originalText;
-      } 
-      // Otherwise, we need to translate the english text (or original text) to the admin's language.
-      else if (englishText != null && englishText.isNotEmpty) {
-         final translationService = ref.read(translationServiceProvider);
-         // Map to targetLang name for Gemini
-         String targetLangName = 'English';
-         switch (currentAppLang) {
-            case 'ta': targetLangName = 'Tamil'; break;
-            case 'hi': targetLangName = 'Hindi'; break;
-            case 'te': targetLangName = 'Telugu'; break;
-            case 'pa': targetLangName = 'Punjabi'; break;
-            case 'mr': targetLangName = 'Marathi'; break;
-            case 'gu': targetLangName = 'Gujarati'; break;
-            case 'bn': targetLangName = 'Bengali'; break;
-            case 'kn': targetLangName = 'Kannada'; break;
-            case 'ml': targetLangName = 'Malayalam'; break;
-            case 'or': targetLangName = 'Odia'; break;
-         }
-         
-         final translated = await translationService.translate(englishText, targetLang: targetLangName);
-         if (translated.isNotEmpty) {
-            textToPlay = translated;
-         }
+      // If Admin language is different from English and we have englishText, translate it
+      if (targetSarvamCode != 'en-IN' && englishText != null && englishText.isNotEmpty) {
+        final sarvamService = ref.read(sarvamApiServiceProvider);
+        textToPlay = await sarvamService.translateText(
+          englishText,
+          sourceLanguage: 'en-IN',
+          targetLanguage: targetSarvamCode,
+        );
+      } else if (targetSarvamCode == 'en-IN' && englishText != null && englishText.isNotEmpty) {
+        textToPlay = englishText;
       }
 
       await _ttsService.speak(textToPlay, language: targetSarvamCode);
@@ -265,77 +261,70 @@ class _SubmissionCardState extends ConsumerState<SubmissionCard> {
             // Audio Player
             if (hasAudio || originalText.isNotEmpty) ...[
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              Row(
                 children: [
-                  if (hasAudio)
-                    InkWell(
-                      onTap: _toggleAudio,
-                      borderRadius: BorderRadius.circular(30),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.teal.shade50,
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: Colors.teal.shade100),
+                  if (hasAudio) ...[
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _toggleAudio,
+                        icon: Icon(
+                          _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          size: 18,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                              color: Colors.teal,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _isPlaying ? 'Playing Audio...' : 'Play Audio',
-                              style: const TextStyle(
-                                color: Colors.teal,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                        label: Text(
+                          _isPlaying ? 'Playing...' : 'Audio',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal.shade50,
+                          foregroundColor: Colors.teal,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            side: BorderSide(color: Colors.teal.shade200),
+                          ),
                         ),
                       ),
                     ),
-                  
+                    const SizedBox(width: 12),
+                  ],
                   if (originalText.isNotEmpty)
-                    InkWell(
-                      onTap: _isTtsLoading ? null : () => _toggleTts(originalText, englishText, userLanguage),
-                      borderRadius: BorderRadius.circular(30),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _isTtsLoading ? Colors.grey.shade100 : Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: _isTtsLoading ? Colors.grey.shade300 : Colors.blue.shade100),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _isTtsLoading
-                                ? const SizedBox(
-                                    width: 16, 
-                                    height: 16, 
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue)
-                                  )
-                                : Icon(
-                                    _isTtsPlaying ? Icons.stop_rounded : Icons.volume_up_rounded,
-                                    color: _isTtsLoading ? Colors.grey : Colors.blue,
-                                  ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _isTtsLoading ? 'Translating...' : (_isTtsPlaying ? 'Stop TTS' : 'Play TTS'),
-                              style: TextStyle(
-                                color: _isTtsLoading ? Colors.grey : Colors.blue,
-                                fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _isTtsLoading ? null : () => _toggleTts(originalText, englishText, userLanguage),
+                        icon: _isTtsLoading
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue.shade700),
+                              )
+                            : Icon(
+                                _isTtsPlaying ? Icons.stop_rounded : Icons.volume_up_rounded,
+                                size: 18,
+                                color: Colors.blue.shade700,
                               ),
-                            ),
-                          ],
+                        label: Text(
+                          _isTtsLoading ? '...' : (_isTtsPlaying ? 'Stop' : 'Play TTS'),
+                          style: TextStyle(
+                            color: Colors.blue.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade50,
+                          foregroundColor: Colors.blue.shade700,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            side: BorderSide(color: Colors.blue.shade200),
+                          ),
                         ),
                       ),
                     ),
+                  if (!hasAudio && originalText.isNotEmpty)
+                    const Spacer(), // Ensure button doesn't stretch too wide if only one
                 ],
               ),
             ],

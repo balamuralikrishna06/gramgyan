@@ -122,13 +122,33 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     }
 
     return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       appBar: AppBar(
-        title: const Text('Knowledge Verification'),
+        backgroundColor: const Color(0xFFF5F1E6),
+        foregroundColor: AppColors.primaryDark,
+        elevation: 0,
+        titleSpacing: 0,
+        centerTitle: false,
+        title: const Text(
+          'Knowledge Verification',
+          style: TextStyle(
+            fontWeight: FontWeight.w500, 
+            fontSize: 18, 
+            color: AppColors.onSurfaceLight,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, size: 24, color: AppColors.onSurfaceLight),
+          tooltip: 'Back',
+          onPressed: () => context.pop(),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded, size: 24, color: AppColors.onSurfaceLight),
+            tooltip: 'Refresh',
             onPressed: _fetchSubmissions,
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
