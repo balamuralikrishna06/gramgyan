@@ -97,13 +97,19 @@ class ProfileController {
     // Get existing profile data to preserve it during update
     final currentProfile = _ref.read(farmerProfileProvider).valueOrNull;
 
+    // ✅ Preserve the current role — do NOT hardcode 'farmer'
+    final authState = _ref.read(authStateProvider);
+    final currentRole = (authState is AuthAuthenticated)
+        ? (authState.role ?? 'farmer')
+        : 'farmer';
+
     try {
       await _ref.read(authRepositoryProvider).updateProfile(
         name: currentProfile?.name ?? user.displayName ?? 'Farmer',
         state: currentProfile?.state ?? '',
         city: currentProfile?.city ?? '',
         language: newLanguage,
-        role: 'farmer',
+        role: currentRole,
       );
       
       // Invalidate the profile provider to reflect changes
