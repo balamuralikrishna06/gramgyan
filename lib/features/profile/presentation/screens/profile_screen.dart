@@ -349,56 +349,62 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                ...AppConstants.supportedLanguages.map((lang) {
-                  final theme = Theme.of(context);
-                  final isSelected = lang['english'] == currentLanguage;
-                  return ListTile(
-                    leading: Text(lang['icon']!, style: const TextStyle(fontSize: 24)),
-                    title: Text(
-                      lang['name']!,
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        color: theme.colorScheme.onSurface,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                      ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: AppConstants.supportedLanguages.map((lang) {
+                        final theme = Theme.of(context);
+                        final isSelected = lang['english'] == currentLanguage;
+                        return ListTile(
+                          leading: Text(lang['icon']!, style: const TextStyle(fontSize: 24)),
+                          title: Text(
+                            lang['name']!,
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                            ),
+                          ),
+                          subtitle: Text(
+                            lang['english']!,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          trailing: isSelected 
+                              ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                              : null,
+                          onTap: () async {
+                            Navigator.pop(context);
+                            if (!isSelected) {
+                              try {
+                                await ref.read(profileControllerProvider).updateLanguage(lang['english']!);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Language changed to ${lang['english']}'),
+                                      backgroundColor: AppColors.success,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Failed to update language'),
+                                      backgroundColor: AppColors.error,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              }
+                            }
+                          },
+                        );
+                      }).toList(),
                     ),
-                    subtitle: Text(
-                      lang['english']!,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    trailing: isSelected 
-                        ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
-                        : null,
-                    onTap: () async {
-                      Navigator.pop(context);
-                      if (!isSelected) {
-                        try {
-                          await ref.read(profileControllerProvider).updateLanguage(lang['english']!);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Language changed to ${lang['english']}'),
-                                backgroundColor: AppColors.success,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('Failed to update language'),
-                                backgroundColor: AppColors.error,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        }
-                      }
-                    },
-                  );
-                }),
+                  ),
+                ),
               ],
             ),
           ),

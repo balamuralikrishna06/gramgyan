@@ -49,12 +49,17 @@ class AppConstants {
     'Verified',
   ];
 
-  // ── Supported Languages ──
   static const List<Map<String, String>> supportedLanguages = [
     {'code': 'ta', 'name': 'தமிழ்', 'english': 'Tamil', 'icon': '🇮🇳'},
     {'code': 'hi', 'name': 'हिन्दी', 'english': 'Hindi', 'icon': '🇮🇳'},
     {'code': 'te', 'name': 'తెలుగు', 'english': 'Telugu', 'icon': '🇮🇳'},
     {'code': 'pa', 'name': 'ਪੰਜਾਬੀ', 'english': 'Punjabi', 'icon': '🇮🇳'},
+    {'code': 'mr', 'name': 'मराठी', 'english': 'Marathi', 'icon': '🇮🇳'},
+    {'code': 'or', 'name': 'ଓଡ଼ିଆ', 'english': 'Odia', 'icon': '🇮🇳'},
+    {'code': 'bn', 'name': 'বাংলা', 'english': 'Bengali', 'icon': '🇮🇳'},
+    {'code': 'gu', 'name': 'ગુજરાતી', 'english': 'Gujarati', 'icon': '🇮🇳'},
+    {'code': 'kn', 'name': 'ಕನ್ನಡ', 'english': 'Kannada', 'icon': '🇮🇳'},
+    {'code': 'ml', 'name': 'മലയാളം', 'english': 'Malayalam', 'icon': '🇮🇳'},
     {'code': 'en', 'name': 'English', 'english': 'English', 'icon': '🌐'},
   ];
 
