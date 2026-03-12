@@ -1,6 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 import logging
-from app.services.supabase_client import get_supabase_client
+from app.services.supabase import get_supabase_client
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
