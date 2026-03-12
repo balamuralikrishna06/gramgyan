@@ -135,4 +135,9 @@ class AppConstants {
   // Main key accessor (for backward compatibility if needed, but better to use list)
   static String get geminiApiKey => geminiApiKeys.isNotEmpty ? geminiApiKeys.first : '';
   static const String backendUrl = 'https://gramgyan-2.onrender.com/';
+
+  // ── Smart Prediction Keys ──
+  static String get openWeatherApiKey => dotenv.env['OPENWEATHER_API_KEY'] ?? '';
+  static String get groqApiKey => dotenv.env['GROQ_API_KEY'] ?? '';
+  static const String cropPredictionUrl = 'https://crop-prediction-skng.onrender.com/predict';
 }
