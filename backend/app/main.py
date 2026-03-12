@@ -34,7 +34,7 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-from app.routes import speech, auth, gemini
+from app.routes import speech, auth, gemini, alerts
 import logging
 
 # ... imports ...
@@ -42,6 +42,7 @@ import logging
 app.include_router(speech.router, prefix="/api/v1/speech", tags=["speech"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(gemini.router, prefix="/api/v1/gemini", tags=["gemini"])
+app.include_router(alerts.router, prefix="/api/v1/webhooks", tags=["alerts"])
 
 @app.get("/")
 async def root():

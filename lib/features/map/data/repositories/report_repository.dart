@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../domain/models/report.dart';
@@ -501,7 +503,7 @@ class ReportRepository {
         }
       }
 
-      await _client.from('questions').insert({
+      final response = await _client.from('questions').insert({
         if (actualUserId != null && actualUserId.contains('-')) 'user_id': actualUserId,
         if (actualFarmerName != null) 'farmer_name': actualFarmerName,
         'original_text': originalText,
@@ -512,7 +514,28 @@ class ReportRepository {
         'audio_url': audioUrl,
         'location': await getLocationName(latitude, longitude), 
         'status': 'open',
-      });
+      }).select().single();
+
+      final questionId = response['id'];
+
+      // 3. Trigger Community Alerts Webhook
+      try {
+        final backendUrl = const String.fromEnvironment('BACKEND_URL', defaultValue: 'https://gramgyan-backend.onrender.com');
+        final uri = Uri.parse('$backendUrl/api/v1/webhooks/question-alerts');
+        http.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'question_id': questionId,
+            'embedding': embedding,
+            'latitude': latitude,
+            'longitude': longitude,
+            'category': 'Crops', // Defaulting to Crops for now, or pass it in later
+          }),
+        ).ignore(); // Fire and forget
+      } catch (e) {
+        debugPrint('Failed to trigger community alerts webhook: $e');
+      }
     } catch (e) {
       debugPrint('Error creating question: $e');
       throw Exception('Failed to create question: $e');

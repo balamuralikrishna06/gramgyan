@@ -31,8 +31,8 @@ class CropAnalysis {
 class GroqService {
   static const String _groqUrl =
       'https://api.groq.com/openai/v1/chat/completions';
-  // llama-3.1-8b-instant is the current stable free model on Groq
-  static const String _model = 'llama-3.1-8b-instant';
+  // llama-3.3-70b-versatile is much better at multilingual tasks and avoids repetition loops
+  static const String _model = 'llama-3.3-70b-versatile';
 
   Future<List<CropAnalysis>> analyzecrops({
     required List<CropPrediction> predictions,
@@ -117,7 +117,9 @@ class GroqService {
       'messages': [
         {'role': 'user', 'content': prompt},
       ],
-      'temperature': 0.3,
+      'temperature': 0.5,
+      'frequency_penalty': 0.3,
+      'presence_penalty': 0.3,
       'max_tokens': 4096,
     });
 
