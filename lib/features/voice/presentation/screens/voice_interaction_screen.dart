@@ -458,8 +458,8 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           SnackBar(
             content: const Text('Knowledge Shared Successfully! 🚀'),
             backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            behavior: SnackBarBehavior.fixed,
+            duration: const Duration(seconds: 2),
           ),
         );
         context.pop();
