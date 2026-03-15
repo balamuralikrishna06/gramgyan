@@ -300,6 +300,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
               content: const Text('Crop Diagnosed! 🌿'),
               backgroundColor: AppColors.primary,
               behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           );
@@ -424,6 +425,7 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
               content: const Text('Consulted AI & Posted to community! 🌾'),
               backgroundColor: AppColors.primary,
               behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           );
@@ -458,7 +460,9 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
           SnackBar(
             content: const Text('Knowledge Shared Successfully! 🚀'),
             backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.fixed,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             duration: const Duration(seconds: 2),
           ),
         );

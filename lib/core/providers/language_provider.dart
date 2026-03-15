@@ -15,7 +15,7 @@ String toSarvamCode(String? langCode) {
     case 'gu': return 'gu-IN';
     case 'kn': return 'kn-IN';
     case 'ml': return 'ml-IN';
-    case 'or': return 'or-IN';
+    case 'or': return 'od-IN'; // Sarvam expects 'od-IN' for Odia, not 'or-IN'
     case 'en': return 'en-IN';
     default:   return 'en-IN';
   }
