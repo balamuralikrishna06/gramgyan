@@ -98,10 +98,19 @@ class _SubmissionCardState extends ConsumerState<SubmissionCard> {
       }
       
       // Map semantic name to short code if needed
-      if (targetLangCode == 'tamil') targetLangCode = 'ta';
-      if (targetLangCode == 'english') targetLangCode = 'en';
-      if (targetLangCode == 'hindi') targetLangCode = 'hi';
-      if (targetLangCode == 'telugu') targetLangCode = 'te';
+      switch (targetLangCode) {
+        case 'tamil': targetLangCode = 'ta'; break;
+        case 'english': targetLangCode = 'en'; break;
+        case 'hindi': targetLangCode = 'hi'; break;
+        case 'telugu': targetLangCode = 'te'; break;
+        case 'punjabi': targetLangCode = 'pa'; break;
+        case 'marathi': targetLangCode = 'mr'; break;
+        case 'odia': targetLangCode = 'or'; break;
+        case 'bengali': targetLangCode = 'bn'; break;
+        case 'gujarati': targetLangCode = 'gu'; break;
+        case 'kannada': targetLangCode = 'kn'; break;
+        case 'malayalam': targetLangCode = 'ml'; break;
+      }
 
       final targetSarvamCode = toSarvamCode(targetLangCode);
       
