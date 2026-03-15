@@ -188,13 +188,13 @@ class NewsNotifier extends StateNotifier<NewsState> {
     }
   }
 
-  /// Converts language codes to full English names for the LLM prompt.
   String _langCodeToName(String code) {
     const map = {
       'en': 'English',
       'hi': 'Hindi',
       'ta': 'Tamil',
       'te': 'Telugu',
+      'pa': 'Punjabi',
       'mr': 'Marathi',
       'or': 'Odia',
       'bn': 'Bengali',
