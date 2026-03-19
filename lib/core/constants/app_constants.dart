@@ -144,4 +144,15 @@ class AppConstants {
   // ── Crop Prediction ML Model (Render primary, Railway fallback) ──
   static const String cropPredictionPrimaryUrl = 'https://crop-prediction-1-2xcu.onrender.com';
   static const String cropPredictionFallbackUrl = 'https://crop-prediction-production-54d1.up.railway.app';
+
+  // ── Gyan Call Webhook Config ──
+  // Line 1: Expert Support (madhan n8n)
+  static const String gyanCallLine1Endpoint = 'https://madhan1806.app.n8n.cloud/webhook/missed-call';
+  static const String gyanCallLine1To = '+18392616941';
+  static String get gyanCallLine1Sid => dotenv.env['GYANCALL_LINE1_SID'] ?? '';
+
+  // Line 2: Alternate Support (bala n8n)
+  static const String gyanCallLine2Endpoint = 'https://bala006.app.n8n.cloud/webhook/missed-call';
+  static const String gyanCallLine2To = '+15822820653';
+  static String get gyanCallLine2Sid => dotenv.env['GYANCALL_LINE2_SID'] ?? '';
 }
