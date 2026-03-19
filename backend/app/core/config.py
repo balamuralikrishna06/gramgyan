@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     
     # Auth & Database
-    FIREBASE_CREDENTIALS_PATH: str
+    FIREBASE_CREDENTIALS_PATH: str | None = None  # Not needed if FIREBASE_CREDENTIALS_JSON is set
     SUPABASE_URL: str
     SUPABASE_SERVICE_ROLE_KEY: str
 
