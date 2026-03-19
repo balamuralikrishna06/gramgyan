@@ -25,7 +25,7 @@ class TextToSpeechService {
     try {
       _isPlaying = true;
 
-      final uri = Uri.parse('${AppConstants.backendUrl}api/v1/speech/stream').replace(
+      final uri = Uri.parse('${AppConstants.backendPrimaryUrl}/api/v1/speech/stream').replace(
         queryParameters: {
           'text': text,
           'language_code': language,

@@ -31,7 +31,7 @@ class SarvamProcessResponse {
 
 class SarvamApiService {
   // Use Render Production URL from Constants
-  static const String _baseUrl = '${AppConstants.backendUrl}api/v1/speech';
+  static const String _baseUrl = '${AppConstants.backendPrimaryUrl}/api/v1/speech';
 
   final AudioPlayer _audioPlayer = AudioPlayer();
 

@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
 
 class GeminiService {
-  static const String _baseUrl = '${AppConstants.backendUrl}api/v1/gemini';
+  static const String _baseUrl = '${AppConstants.backendPrimaryUrl}/api/v1/gemini';
 
   GeminiService() {
     debugPrint('GeminiService initialized to hit remote backend $_baseUrl');
