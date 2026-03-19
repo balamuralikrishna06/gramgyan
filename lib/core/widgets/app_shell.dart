@@ -5,9 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../features/news/presentation/providers/news_provider.dart';
-import '../../features/news/presentation/widgets/news_overlay.dart';
-import '../../features/home/presentation/providers/gyan_call_provider.dart';
+
 
 /// Main app shell with bottom navigation and microphone FAB.
 /// Houses Home, Map, and Profile screens, plus a central News overlay button.
@@ -21,69 +19,31 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  bool _isNewsOverlayVisible = false;
-
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
-    if (location.startsWith('/map')) return 2;
-    if (location.startsWith('/profile')) return 3;
+    if (location.startsWith('/map')) return 1;
+    if (location.startsWith('/profile')) return 2;
     return 0; // home
   }
 
   void _onNavTap(BuildContext context, int index) {
-    // Auto-close news overlay when switching to any other tab
-    if (index != 1 && _isNewsOverlayVisible) {
-      ref.read(newsProvider.notifier).stopAudio();
-      setState(() => _isNewsOverlayVisible = false);
-    }
-
     switch (index) {
       case 0:
         context.go('/home');
         break;
       case 1:
-        // News button — toggle overlay
-        _handleNewsTap();
-        break;
-      case 2:
         context.go('/map');
         break;
-      case 3:
+      case 2:
         context.go('/profile');
         break;
     }
-  }
-
-  void _handleNewsTap() {
-    HapticFeedback.mediumImpact();
-    final newsState = ref.read(newsProvider);
-
-    // If overlay already open, close it and stop audio
-    if (_isNewsOverlayVisible) {
-      ref.read(newsProvider.notifier).stopAudio();
-      setState(() => _isNewsOverlayVisible = false);
-      return;
-    }
-
-    // If already playing (edge case), stop first
-    if (newsState.isPlaying) {
-      ref.read(newsProvider.notifier).stopAudio();
-    }
-
-    // Open overlay and trigger fetch
-    setState(() => _isNewsOverlayVisible = true);
-    ref.read(newsProvider.notifier).fetchAndPlay();
-  }
-
-  void _closeNewsOverlay() {
-    setState(() => _isNewsOverlayVisible = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final index = _currentIndex(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isGyanCallOpen = ref.watch(gyanCallOpenProvider);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
@@ -98,12 +58,6 @@ class _AppShellState extends ConsumerState<AppShell> {
           children: [
             // ── Main page content ──
             widget.child,
-
-            // ── News frosted glass overlay ──
-            if (_isNewsOverlayVisible)
-              Positioned.fill(
-                child: NewsOverlay(onClose: _closeNewsOverlay),
-              ),
           ],
         ),
         bottomNavigationBar: Container(
@@ -117,38 +71,20 @@ class _AppShellState extends ConsumerState<AppShell> {
             ),
           ),
           child: NavigationBar(
-            selectedIndex: _isNewsOverlayVisible ? 1 : index,
+            selectedIndex: index,
             onDestinationSelected: (i) => _onNavTap(context, i),
-            destinations: [
-              const NavigationDestination(
+            destinations: const [
+              NavigationDestination(
                 icon: Icon(Icons.home_outlined),
                 selectedIcon: Icon(Icons.home_rounded),
                 label: 'Home',
               ),
-              // ── News (center) ──
               NavigationDestination(
-                icon: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: _isNewsOverlayVisible
-                      ? const Icon(
-                          Icons.close_rounded,
-                          key: ValueKey('news_close'),
-                          color: AppColors.primary,
-                        )
-                      : const Icon(
-                          Icons.newspaper_rounded,
-                          key: ValueKey('news_open'),
-                        ),
-                ),
-                selectedIcon: const Icon(Icons.newspaper_rounded),
-                label: 'News',
-              ),
-              const NavigationDestination(
                 icon: Icon(Icons.map_outlined),
                 selectedIcon: Icon(Icons.map_rounded),
                 label: 'Map',
               ),
-              const NavigationDestination(
+              NavigationDestination(
                 icon: Icon(Icons.person_outline_rounded),
                 selectedIcon: Icon(Icons.person_rounded),
                 label: 'Profile',
@@ -156,7 +92,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             ],
           ),
         ),
-        floatingActionButton: (!_isNewsOverlayVisible && !isGyanCallOpen && index == 0)
+        floatingActionButton: index == 0
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

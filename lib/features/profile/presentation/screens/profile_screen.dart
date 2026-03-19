@@ -219,35 +219,7 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
 
-            // Generate Report Button (admin only)
-            if (authState is AuthAuthenticated && authState.role == 'admin')
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16)
-                    .copyWith(bottom: 8),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: OutlinedButton.icon(
-                    onPressed: () => context.push('/report-generator'),
-                    icon: const Icon(Icons.insert_chart_outlined_rounded,
-                        color: AppColors.primary),
-                    label: const Text(
-                      'Generate Report',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.primary, width: 1.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+
 
             // ── Settings Section ──
             Text(
@@ -349,7 +321,7 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Expanded(
+                Flexible(
                   child: SingleChildScrollView(
                     child: Column(
                       children: AppConstants.supportedLanguages.map((lang) {

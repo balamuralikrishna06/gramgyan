@@ -19,7 +19,7 @@ import '../../features/climate/presentation/screens/climate_screen.dart';
 import '../../features/voice/presentation/screens/voice_interaction_screen.dart';
 import '../../features/chat/presentation/screens/chat_interaction_screen.dart';
 import '../../features/home/presentation/screens/notifications_screen.dart';
-import '../../features/admin/presentation/screens/report_generator_screen.dart';
+
 import '../widgets/app_shell.dart';
 
 /// GoRouter configuration for the app.
@@ -300,25 +300,7 @@ final appRouter = GoRouter(
       ),
     ),
 
-    // ── Report Generator (full screen, admin only) ──
-    GoRoute(
-      path: '/report-generator',
-      pageBuilder: (context, state) => CustomTransitionPage(
-        child: const ReportGeneratorScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(1, 0),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-            )),
-            child: child,
-          );
-        },
-      ),
-    ),
+
 
     // ── Notifications (full screen) ──
     GoRoute(

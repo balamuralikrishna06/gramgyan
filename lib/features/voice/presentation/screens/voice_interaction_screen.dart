@@ -552,10 +552,9 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
                     ),
                   ),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildToggleOption(VoiceMode.ask, 'Ask Problem'),
-                      _buildToggleOption(VoiceMode.share, 'Share Knowledge'),
+                      Expanded(child: _buildToggleOption(VoiceMode.ask, 'Ask Problem')),
+                      Expanded(child: _buildToggleOption(VoiceMode.share, 'Share Knowledge')),
                     ],
                   ),
                 ),
@@ -996,16 +995,21 @@ class _VoiceInteractionScreenState extends ConsumerState<VoiceInteractionScreen>
       onTap: () => setState(() => _selectedMode = mode),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(24),
         ),
-        child: Text(
-          label,
-          style: AppTextStyles.titleSmall.copyWith(
-            color: isSelected ? Colors.white : AppColors.onSurfaceVariantLight,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.titleSmall.copyWith(
+              color: isSelected ? Colors.white : AppColors.onSurfaceVariantLight,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
           ),
         ),
       ),

@@ -304,6 +304,7 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon,
             size: 16,
@@ -315,12 +316,15 @@ class _InfoRow extends StatelessWidget {
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        const Spacer(),
-        Text(
-          value,
-          style: AppTextStyles.labelSmall.copyWith(
-            color: Theme.of(context).colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],

@@ -13,7 +13,7 @@ import '../providers/notification_providers.dart';
 import '../../../../shared/widgets/knowledge_card.dart';
 import '../../../../shared/widgets/filter_chip_bar.dart';
 import '../../../../shared/widgets/shimmer_card.dart';
-import '../widgets/gyan_call_sheet.dart';
+
 
 import '../../../../features/auth/presentation/providers/auth_providers.dart';
 import '../../../../features/auth/domain/models/auth_state.dart';
@@ -125,14 +125,7 @@ class HomeScreen extends ConsumerWidget {
                   isDark: isDark,
                   onTap: () => context.push('/climate'),
                 ),
-                const SizedBox(width: 12),
-                _QuickAction(
-                  icon: Icons.phone_forwarded_rounded,
-                  label: 'Help Others',
-                  color: AppColors.primary,
-                  isDark: isDark,
-                  onTap: () => showGyanCallSheet(context, ref),
-                ),
+
               ],
             ),
           ),
