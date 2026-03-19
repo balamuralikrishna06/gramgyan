@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../features/news/presentation/providers/news_provider.dart';
 import '../../features/news/presentation/widgets/news_overlay.dart';
+import '../../features/home/presentation/providers/gyan_call_provider.dart';
 
 /// Main app shell with bottom navigation and microphone FAB.
 /// Houses Home, Map, and Profile screens, plus a central News overlay button.
@@ -82,6 +83,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     final index = _currentIndex(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isGyanCallOpen = ref.watch(gyanCallOpenProvider);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
@@ -154,7 +156,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             ],
           ),
         ),
-        floatingActionButton: (!_isNewsOverlayVisible && index == 0)
+        floatingActionButton: (!_isNewsOverlayVisible && !isGyanCallOpen && index == 0)
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -181,3 +183,4 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 }
+
