@@ -134,10 +134,14 @@ class AppConstants {
   
   // Main key accessor (for backward compatibility if needed, but better to use list)
   static String get geminiApiKey => geminiApiKeys.isNotEmpty ? geminiApiKeys.first : '';
-  static const String backendUrl = 'https://gramgyan-2.onrender.com/';
+  // ── GramGyan Backend (Render primary, Railway fallback) ──
+  static const String backendPrimaryUrl = 'https://gramgyan-backend.onrender.com';
+  static const String backendFallbackUrl = 'https://gramgyan-production.up.railway.app';
 
   // ── Smart Prediction Keys ──
   static String get openWeatherApiKey => dotenv.env['OPENWEATHER_API_KEY'] ?? '';
   static String get groqApiKey => dotenv.env['GROQ_API_KEY'] ?? '';
-  static const String cropPredictionUrl = 'https://crop-prediction-skng.onrender.com/predict';
+  // ── Crop Prediction ML Model (Render primary, Railway fallback) ──
+  static const String cropPredictionPrimaryUrl = 'https://crop-prediction-1-2xcu.onrender.com';
+  static const String cropPredictionFallbackUrl = 'https://crop-prediction-production-54d1.up.railway.app';
 }

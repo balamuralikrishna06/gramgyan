@@ -17,7 +17,7 @@ class ReportGeneratorRepository {
 
   static const String _table = 'report_users';
   static const String _webhookUrl =
-      'https://balamuralikrishna06.app.n8n.cloud/webhook/generate-report';
+      'https://bala006.app.n8n.cloud/webhook/generate-report';
 
   const ReportGeneratorRepository(this._client);
 

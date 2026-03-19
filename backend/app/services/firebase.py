@@ -2,6 +2,8 @@ import firebase_admin
 from firebase_admin import credentials, auth
 from app.core.config import get_settings
 import logging
+import json
+import os
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -10,7 +12,15 @@ def initialize_firebase():
     """Initialize Firebase Admin SDK"""
     try:
         if not firebase_admin._apps:
-            cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+            # Prefer inline JSON (for cloud deployments like Render/Railway)
+            firebase_json = os.environ.get("FIREBASE_CREDENTIALS_JSON")
+            if firebase_json:
+                cred_dict = json.loads(firebase_json)
+                cred = credentials.Certificate(cred_dict)
+            else:
+                # Fallback to file path (for local development)
+                cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+            
             firebase_admin.initialize_app(cred)
             logger.info("Firebase Admin SDK initialized successfully")
     except Exception as e:

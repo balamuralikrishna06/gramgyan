@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 /// Repository responsible for fetching agri news from the n8n webhook.
 class NewsRepository {
   static const String _webhookUrl =
-      'https://balamuralikrishna06.app.n8n.cloud/webhook/get-agri-news';
+      'https://bala006.app.n8n.cloud/webhook/get-agri-news';
 
   /// Sends a POST request with [userId], [lat], [lon] to the n8n webhook. 
   ///

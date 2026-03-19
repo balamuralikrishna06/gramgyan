@@ -7,6 +7,7 @@ import 'package:geocoding/geocoding.dart';
 import '../../domain/models/report.dart';
 import '../../../../core/services/gemini_service.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/services/failover_http_client.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ReportRepository {
@@ -520,18 +521,20 @@ class ReportRepository {
 
       // 3. Trigger Community Alerts Webhook
       try {
-        final backendUrl = const String.fromEnvironment('BACKEND_URL', defaultValue: 'https://gramgyan-backend.onrender.com');
-        final uri = Uri.parse('$backendUrl/api/v1/webhooks/question-alerts');
-        http.post(
-          uri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
+        final _webhookClient = FailoverHttpClient(
+          primaryUrl: AppConstants.backendPrimaryUrl,
+          fallbackUrl: AppConstants.backendFallbackUrl,
+          timeout: const Duration(seconds: 10),
+        );
+        _webhookClient.post(
+          '/api/v1/webhooks/question-alerts',
+          body: {
             'question_id': questionId,
             'embedding': embedding,
             'latitude': latitude,
             'longitude': longitude,
-            'category': 'Crops', // Defaulting to Crops for now, or pass it in later
-          }),
+            'category': 'Crops',
+          },
         ).ignore(); // Fire and forget
       } catch (e) {
         debugPrint('Failed to trigger community alerts webhook: $e');
