@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
+import 'failover_http_client.dart';
 
 /// A single crop prediction from the ML model.
 class CropPrediction {
@@ -17,14 +17,17 @@ class CropPrediction {
 }
 
 class CropPredictionService {
-  /// Calls the Render ML API.
+  static final _client = FailoverHttpClient(
+    primaryUrl: AppConstants.cropPredictionPrimaryUrl,
+    fallbackUrl: AppConstants.cropPredictionFallbackUrl,
+    timeout: const Duration(seconds: 90),
+  );
+
+  /// Calls the ML API with automatic failover between Render and Railway.
   ///
-  /// After the backend update, the response contains:
+  /// Response format:
   ///   { "predicted_crop": "muskmelon",
   ///     "predictions": [{"crop":"muskmelon","probability":0.42,"rank":1}, ...] }
-  ///
-  /// Falls back gracefully to the old single-crop format if the backend
-  /// has not been updated yet.
   Future<List<CropPrediction>> predict({
     required double nitrogen,
     required double phosphorus,
@@ -34,7 +37,7 @@ class CropPredictionService {
     required double humidity,
     required double rainfall,
   }) async {
-    final body = jsonEncode({
+    final body = {
       'N': nitrogen,
       'P': phosphorus,
       'K': potassium,
@@ -42,22 +45,16 @@ class CropPredictionService {
       'temperature': temperature,
       'humidity': humidity,
       'rainfall': rainfall,
-    });
+    };
 
-    debugPrint('CropPredictionService POST ${AppConstants.cropPredictionUrl}');
+    debugPrint('CropPredictionService POST /predict (with failover)');
 
-    final response = await http
-        .post(
-          Uri.parse(AppConstants.cropPredictionUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: body,
-        )
-        .timeout(const Duration(seconds: 90));
+    final response = await _client.post('/predict', body: body);
 
     if (response.statusCode != 200) {
       throw Exception(
         'Crop prediction API error (${response.statusCode}). '
-        'The model server may be starting up — please retry in 30 seconds.',
+        'Both Render and Railway may be unavailable — please retry.',
       );
     }
 

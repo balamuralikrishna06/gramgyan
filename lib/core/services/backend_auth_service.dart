@@ -1,22 +1,19 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../constants/app_constants.dart';
+import 'failover_http_client.dart';
 
 class BackendAuthService {
-  late final String _baseUrl;
-
-  BackendAuthService() {
-    _baseUrl = dotenv.env['BACKEND_URL'] ?? 'http://10.0.2.2:8000';
-  }
+  static final _client = FailoverHttpClient(
+    primaryUrl: AppConstants.backendPrimaryUrl,
+    fallbackUrl: AppConstants.backendFallbackUrl,
+    timeout: const Duration(seconds: 20),
+  );
 
   Future<Map<String, dynamic>> firebaseLogin(String token) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/auth/firebase-login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'token': token}),
-    ).timeout(
-      const Duration(seconds: 15),
-      onTimeout: () => throw Exception('Backend request timed out. Server may be waking up — please try again.'),
+    final response = await _client.post(
+      '/auth/firebase-login',
+      body: {'token': token},
     );
 
     if (response.statusCode == 200) {
@@ -47,13 +44,9 @@ class BackendAuthService {
     if (phone != null && phone.isNotEmpty) body['phone'] = phone;
     if (email != null && email.isNotEmpty) body['email'] = email;
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/auth/profile/update'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    ).timeout(
-      const Duration(seconds: 15),
-      onTimeout: () => throw Exception('Backend request timed out. Please try again.'),
+    final response = await _client.post(
+      '/auth/profile/update',
+      body: body,
     );
 
     if (response.statusCode == 200) {
