@@ -119,7 +119,18 @@ class AppConstants {
   ];
 
   // ── API Keys & Endpoints ──
-  static const String sarvamApiKey = 'sk_1m08qk56_DYpiv9SX2uLX7l7gF8SdTpD3'; // TODO: Move to .env for production
+  static List<String> get sarvamApiKeys {
+    final keys = <String>[];
+    final key1 = dotenv.env['SARVAM_API_KEY'];
+    if (key1 != null && key1.isNotEmpty) keys.add(key1.trim());
+    
+    final key2 = dotenv.env['SARVAM_API_KEY_2'];
+    if (key2 != null && key2.isNotEmpty) keys.add(key2.trim());
+    return keys;
+  }
+  
+  // Safe single-key accessor
+  static String get sarvamApiKey => sarvamApiKeys.isNotEmpty ? sarvamApiKeys.first : '';
   
   // Supports multiple keys for rotation (comma-separated in .env)
   static List<String> get geminiApiKeys {
@@ -140,7 +151,6 @@ class AppConstants {
 
   // ── Smart Prediction Keys ──
   static String get openWeatherApiKey => dotenv.env['OPENWEATHER_API_KEY'] ?? '';
-  static String get groqApiKey => dotenv.env['GROQ_API_KEY'] ?? '';
   // ── Crop Prediction ML Model (Render primary, Railway fallback) ──
   static const String cropPredictionPrimaryUrl = 'https://crop-prediction-1-2xcu.onrender.com';
   static const String cropPredictionFallbackUrl = 'https://crop-prediction-production-54d1.up.railway.app';
