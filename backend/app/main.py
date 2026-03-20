@@ -34,7 +34,7 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-from app.routes import speech, auth, gemini, alerts, crop
+from app.routes import speech, auth, gemini, alerts, crop, weather, gyancall
 import logging
 
 # ... imports ...
@@ -44,6 +44,8 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(gemini.router, prefix="/api/v1/gemini", tags=["gemini"])
 app.include_router(alerts.router, prefix="/api/v1/webhooks", tags=["alerts"])
 app.include_router(crop.router, prefix="/api/v1/crop", tags=["crop"])
+app.include_router(weather.router, prefix="/api/v1/weather", tags=["weather"])
+app.include_router(gyancall.router, prefix="/api/v1/gyancall", tags=["gyancall"])
 
 @app.get("/")
 async def root():

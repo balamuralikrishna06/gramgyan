@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEYS: str | None = None # Comma separated for rotation
     GROQ_API_KEY: str | None = None
     GROQ_API_KEY_2: str | None = None # Fallback key if primary hits quota
+    OPENWEATHER_API_KEY: str | None = None
+    GYANCALL_LINE1_SID: str | None = None
+    GYANCALL_LINE2_SID: str | None = None
     DEBUG: bool = False
     
     # Auth & Database

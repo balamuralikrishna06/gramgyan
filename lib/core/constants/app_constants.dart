@@ -132,37 +132,11 @@ class AppConstants {
   // Safe single-key accessor
   static String get sarvamApiKey => sarvamApiKeys.isNotEmpty ? sarvamApiKeys.first : '';
   
-  // Supports multiple keys for rotation (comma-separated in .env)
-  static List<String> get geminiApiKeys {
-    final keysString = dotenv.env['GEMINI_API_KEYS'];
-    if (keysString != null && keysString.isNotEmpty) {
-      return keysString.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-    }
-    // Fallback to single key
-    final singleKey = dotenv.env['GEMINI_API_KEY'];
-    return (singleKey != null && singleKey.isNotEmpty) ? [singleKey] : [];
-  }
-  
-  // Main key accessor (for backward compatibility if needed, but better to use list)
-  static String get geminiApiKey => geminiApiKeys.isNotEmpty ? geminiApiKeys.first : '';
   // ── GramGyan Backend (Render primary, Railway fallback) ──
   static const String backendPrimaryUrl = 'https://gramgyan-backend.onrender.com';
   static const String backendFallbackUrl = 'https://gramgyan-production.up.railway.app';
 
-  // ── Smart Prediction Keys ──
-  static String get openWeatherApiKey => dotenv.env['OPENWEATHER_API_KEY'] ?? '';
   // ── Crop Prediction ML Model (Render primary, Railway fallback) ──
   static const String cropPredictionPrimaryUrl = 'https://crop-prediction-1-2xcu.onrender.com';
   static const String cropPredictionFallbackUrl = 'https://crop-prediction-production-54d1.up.railway.app';
-
-  // ── Gyan Call Webhook Config ──
-  // Line 1: Expert Support (madhan n8n)
-  static const String gyanCallLine1Endpoint = 'https://madhan1806.app.n8n.cloud/webhook/missed-call';
-  static const String gyanCallLine1To = '+18392616941';
-  static String get gyanCallLine1Sid => dotenv.env['GYANCALL_LINE1_SID'] ?? '';
-
-  // Line 2: Alternate Support (bala n8n)
-  static const String gyanCallLine2Endpoint = 'https://bala006.app.n8n.cloud/webhook/missed-call';
-  static const String gyanCallLine2To = '+15822820653';
-  static String get gyanCallLine2Sid => dotenv.env['GYANCALL_LINE2_SID'] ?? '';
 }
