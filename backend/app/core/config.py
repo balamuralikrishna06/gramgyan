@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     SARVAM_API_KEY_2: str | None = None  # Fallback key if primary hits quota
     GEMINI_API_KEY: str | None = None # Add this in Render Env
     GEMINI_API_KEYS: str | None = None # Comma separated for rotation
+    GROQ_API_KEY: str | None = None
+    GROQ_API_KEY_2: str | None = None # Fallback key if primary hits quota
+    OPENWEATHER_API_KEY: str | None = None
     DEBUG: bool = False
     
     # Auth & Database

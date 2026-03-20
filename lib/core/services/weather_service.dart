@@ -60,32 +60,21 @@ class WeatherService {
     final lon = position.longitude;
     debugPrint('WeatherService: GPS lat=$lat, lon=$lon');
 
-    // ── 3. OpenWeatherMap Current Weather ───────────────────────────
-    final apiKey = AppConstants.openWeatherApiKey;
-    if (apiKey.isEmpty || apiKey == 'YOUR_OPENWEATHER_KEY_HERE') {
-      throw Exception(
-        'OpenWeather API key not configured. Add OPENWEATHER_API_KEY to .env.',
-      );
-    }
-
     final uri = Uri.parse(
-      'https://api.openweathermap.org/data/2.5/weather'
-      '?lat=$lat&lon=$lon&appid=$apiKey&units=metric',
+      '${AppConstants.backendPrimaryUrl}/api/v1/weather?lat=$lat&lon=$lon',
     );
 
     final response = await http.get(uri).timeout(const Duration(seconds: 20));
 
     if (response.statusCode != 200) {
-      throw Exception(
-        'Weather API error (${response.statusCode}). Check OPENWEATHER_API_KEY.',
-      );
+      throw Exception('Weather API error (${response.statusCode}).');
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final double temperature = (data['main']['temp'] as num).toDouble();
-    final double humidity = (data['main']['humidity'] as num).toDouble();
+    final double temperature = (data['temperature'] as num).toDouble();
+    final double humidity = (data['humidity'] as num).toDouble();
 
-    debugPrint('WeatherService: temp=$temperature°C, humidity=$humidity%');
+    debugPrint('WeatherService (Backend): temp=$temperature°C, humidity=$humidity%');
 
     return WeatherData(
       temperature: temperature,
