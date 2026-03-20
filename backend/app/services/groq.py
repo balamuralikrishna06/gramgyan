@@ -1,7 +1,49 @@
 import httpx
 import json
+import re
 import logging
 from app.core.config import get_settings
+
+config = get_settings()
+logger = logging.getLogger(__name__)
+
+def _extract_json_array(text: str) -> list | None:
+    """
+    Tries multiple strategies to extract a valid JSON array from Groq's response.
+    Handles markdown fences, control characters, and offset bracket detection.
+    """
+    # Strategy 1: Strip markdown fences and try direct parse
+    cleaned = re.sub(r'```(?:json)?', '', text).strip()
+    # Strip invisible control characters that break json.loads (common in multilingual responses)
+    cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', cleaned)
+    try:
+        result = json.loads(cleaned)
+        if isinstance(result, list):
+            return result
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: Find the outermost [...] using bracket depth scanning
+    start = text.find('[')
+    if start != -1:
+        depth = 0
+        for i, ch in enumerate(text[start:], start=start):
+            if ch == '[':
+                depth += 1
+            elif ch == ']':
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start:i+1]
+                    # Clean control chars from candidate too
+                    candidate = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', candidate)
+                    try:
+                        result = json.loads(candidate)
+                        if isinstance(result, list):
+                            return result
+                    except json.JSONDecodeError:
+                        break
+
+    return None
 
 config = get_settings()
 logger = logging.getLogger(__name__)
@@ -112,15 +154,14 @@ async def analyze_crops(
 
                 response.raise_for_status()
                 content = response.json()['choices'][0]['message']['content']
-                cleaned = content.replace('```json', '').replace('```', '').strip()
+                logger.info(f"Groq raw response length: {len(content)} chars")
 
-                try:
-                    return json.loads(cleaned)
-                except json.JSONDecodeError:
-                    start, end = content.find('['), content.rfind(']')
-                    if start != -1 and end > start:
-                        return json.loads(content[start:end+1])
-                    raise Exception(f"Could not parse Groq response as JSON: {content}")
+                # Parse with multiple fallback strategies
+                result = _extract_json_array(content)
+                if result:
+                    return result
+
+                raise Exception(f"Could not parse Groq response. Raw content: {content[:300]}")
 
         except httpx.HTTPStatusError as e:
             if _should_fallback(e.response.status_code) and i < len(keys) - 1:
