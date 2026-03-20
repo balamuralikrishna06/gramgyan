@@ -1,4 +1,4 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+// No external imports needed — all secrets live on the Render backend.
 
 /// App-wide constants for GramGyan.
 class AppConstants {
@@ -118,20 +118,6 @@ class AppConstants {
     {'id': 'community_helper', 'label': 'Community Helper', 'icon': '🤝'},
   ];
 
-  // ── API Keys & Endpoints ──
-  static List<String> get sarvamApiKeys {
-    final keys = <String>[];
-    final key1 = dotenv.env['SARVAM_API_KEY'];
-    if (key1 != null && key1.isNotEmpty) keys.add(key1.trim());
-    
-    final key2 = dotenv.env['SARVAM_API_KEY_2'];
-    if (key2 != null && key2.isNotEmpty) keys.add(key2.trim());
-    return keys;
-  }
-  
-  // Safe single-key accessor
-  static String get sarvamApiKey => sarvamApiKeys.isNotEmpty ? sarvamApiKeys.first : '';
-  
   // ── GramGyan Backend (Render primary, Railway fallback) ──
   static const String backendPrimaryUrl = 'https://gramgyan-backend.onrender.com';
   static const String backendFallbackUrl = 'https://gramgyan-production.up.railway.app';
