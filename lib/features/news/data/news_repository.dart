@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../../../../core/constants/app_constants.dart';
 
-/// Repository responsible for fetching agri news from the n8n webhook.
+/// Repository responsible for fetching agri news from the backend proxy.
 class NewsRepository {
-  static const String _webhookUrl =
-      'https://bala006.app.n8n.cloud/webhook/get-agri-news';
+  static String get _webhookUrl =>
+      '${AppConstants.backendPrimaryUrl}/api/v1/n8n/news';
 
   /// Sends a POST request with [userId], [lat], [lon] to the n8n webhook. 
   ///

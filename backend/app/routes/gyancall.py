@@ -14,12 +14,12 @@ class GyanCallRequest(BaseModel):
 
 LINES = {
     1: {
-        "endpoint": "https://madhan1806.app.n8n.cloud/webhook/missed-call",
+        "env_endpoint_key": "GYANCALL_LINE1_ENDPOINT",
         "to": "+18392616941",
         "env_sid_key": "GYANCALL_LINE1_SID"
     },
     2: {
-        "endpoint": "https://bala006.app.n8n.cloud/webhook/missed-call",
+        "env_endpoint_key": "GYANCALL_LINE2_ENDPOINT",
         "to": "+15822820653",
         "env_sid_key": "GYANCALL_LINE2_SID"
     }
@@ -35,8 +35,9 @@ async def trigger_gyan_call(request: GyanCallRequest = Body(...)):
         
     line_config = LINES[request.line]
     account_sid = getattr(config, line_config["env_sid_key"], None)
+    endpoint = getattr(config, line_config["env_endpoint_key"], None)
     
-    if not account_sid:
+    if not account_sid or not endpoint:
         raise HTTPException(status_code=500, detail="Call Service not configured on backend.")
     
     payload = {
@@ -49,7 +50,7 @@ async def trigger_gyan_call(request: GyanCallRequest = Body(...)):
     
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(line_config["endpoint"], json=payload)
+            response = await client.post(endpoint, json=payload)
             response.raise_for_status()
             return {"status": "success"}
     except Exception as e:

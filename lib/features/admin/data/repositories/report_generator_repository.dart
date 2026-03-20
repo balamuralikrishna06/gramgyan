@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/constants/app_constants.dart';
 
 import '../models/report_user.dart';
 
@@ -11,13 +12,13 @@ import '../models/report_user.dart';
 /// Responsibilities:
 ///   - Fetch [ReportUser] records from Supabase [report_users] table.
 ///   - Insert new [ReportUser] records.
-///   - Trigger the n8n report-generation webhook for a given user.
+///   - Trigger the backend n8n report-generation proxy for a given user.
 class ReportGeneratorRepository {
   final SupabaseClient _client;
 
   static const String _table = 'report_users';
-  static const String _webhookUrl =
-      'https://bala006.app.n8n.cloud/webhook/generate-report';
+  static String get _webhookUrl =>
+      '${AppConstants.backendPrimaryUrl}/api/v1/n8n/report';
 
   const ReportGeneratorRepository(this._client);
 

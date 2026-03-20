@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     OPENWEATHER_API_KEY: str | None = None
     GYANCALL_LINE1_SID: str | None = None
     GYANCALL_LINE2_SID: str | None = None
+    GYANCALL_LINE1_ENDPOINT: str | None = None
+    GYANCALL_LINE2_ENDPOINT: str | None = None
+    N8N_NEWS_WEBHOOK_URL: str | None = None
+    N8N_REPORT_WEBHOOK_URL: str | None = None
     DEBUG: bool = False
     
     # Auth & Database
