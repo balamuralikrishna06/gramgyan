@@ -1,31 +1,29 @@
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
 
 class EmbeddingService {
-  late final GenerativeModel _embeddingModel;
-
-  EmbeddingService() {
-    _embeddingModel = GenerativeModel(
-      model: 'models/gemini-embedding-001', 
-      apiKey: AppConstants.geminiApiKey, // Use the shared key
-    );
-  }
-
+  /// Generates an embedding vector for the given [text] via the backend.
   Future<List<double>> generateEmbedding(String text) async {
     try {
-      final content = Content.text(text);
-      final result = await _embeddingModel.embedContent(content);
-      
-      if (result.embedding.values.isEmpty) {
-        throw Exception('Generated embedding is empty');
+      final response = await http
+          .post(
+            Uri.parse('${AppConstants.backendPrimaryUrl}/api/v1/gemini/embed/document'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'text': text}),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode != 200) {
+        throw Exception('Embedding API error (${response.statusCode})');
       }
-      
-      return result.embedding.values;
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final values = data['embedding'] as List<dynamic>;
+      return values.map((e) => (e as num).toDouble()).toList();
     } catch (e) {
-      debugPrint('⚠️ Embedding failed (API Key might lack permission). Using dummy embedding.');
-      // Fallback: Generate a random/zero vector of size 768 so the app doesn't crash
-      // and we can verify Supabase Storage/DB logic.
+      debugPrint('⚠️ Embedding failed: $e. Using zero vector fallback.');
       return List<double>.filled(768, 0.0);
     }
   }
