@@ -1,4 +1,4 @@
-# 🌱 GramGyan
+#  GramGyan
 
 > **A Voice-First Farmer Knowledge Sharing App**
 
