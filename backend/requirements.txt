@@ -1,12 +1,12 @@
 fastapi==0.109.2
 uvicorn==0.27.1
 requests==2.31.0
-httpx
+httpx==0.26.0
 python-multipart==0.0.9
 pydantic-settings==2.1.0
 python-dotenv==1.0.1
 gunicorn==21.2.0
 firebase-admin==6.5.0
-
-supabase>=2.0.0
-google-generativeai>=0.8.0
+supabase==2.4.6
+google-generativeai==0.8.3
+google-auth==2.29.0
