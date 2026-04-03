@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../constants/app_constants.dart';
+import 'failover_http_client.dart';
 
 class SarvamProcessResponse {
   final String transcript;
@@ -30,29 +30,26 @@ class SarvamProcessResponse {
 }
 
 class SarvamApiService {
-  // Use Render Production URL from Constants
-  static const String _baseUrl = '${AppConstants.backendPrimaryUrl}/api/v1/speech';
+  static final _client = FailoverHttpClient(
+    primaryUrl: AppConstants.backendPrimaryUrl,
+    fallbackUrl: AppConstants.backendFallbackUrl,
+    timeout: const Duration(seconds: 45), // Longer timeout for audio processing
+  );
 
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   Future<SarvamProcessResponse> processAudio(String filePath, {String sourceLanguage = 'ta-IN'}) async {
-    final uri = Uri.parse('$_baseUrl/process');
-    
-    var request = http.MultipartRequest('POST', uri);
-    
-    request.files.add(await http.MultipartFile.fromPath(
-      'file', 
-      filePath,
-    ));
-
-    // Add fields if needed
-    request.fields['source_language'] = sourceLanguage;
-    request.fields['target_language'] = 'en-IN';
-
     try {
-      debugPrint('Sending audio to Sarvam Backend: $uri');
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      debugPrint('Sending audio to Sarvam Backend via FailoverHttpClient...');
+      final response = await _client.postMultipart(
+        '/api/v1/speech/process',
+        file: File(filePath),
+        fileField: 'file',
+        fields: {
+          'source_language': sourceLanguage,
+          'target_language': 'en-IN',
+        },
+      );
 
       if (response.statusCode == 200) {
         // Force UTF-8 decoding
@@ -67,21 +64,18 @@ class SarvamApiService {
     }
   }
 
-  /// Converts text to speech using the Render Backend.
+  /// Converts text to speech using the Backend.
   /// Returns the path to the generated audio file.
   Future<String?> textToSpeech(String text, {String languageCode = 'ta-IN'}) async {
     try {
       debugPrint('Sarvam TTS via Backend: Converting text (${text.length} chars) to speech in $languageCode...');
       
-      final response = await http.post(
-        Uri.parse('$_baseUrl/speak'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+      final response = await _client.post(
+        '/api/v1/speech/speak',
+        body: {
           'text': text,
           'language_code': languageCode,
-        }),
+        },
       );
 
       if (response.statusCode == 200) {
@@ -126,7 +120,7 @@ class SarvamApiService {
     await _audioPlayer.stop();
   }
 
-  /// Translates text using the Render Backend.
+  /// Translates text using the Backend.
   /// Supports English ↔ Tamil and other Indian languages.
   Future<String> translateText(String text, {
     String sourceLanguage = 'en-IN',
@@ -135,16 +129,13 @@ class SarvamApiService {
     try {
       debugPrint('Sarvam Translate via Backend: $sourceLanguage → $targetLanguage (${text.length} chars)');
       
-      final response = await http.post(
-        Uri.parse('$_baseUrl/translate'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+      final response = await _client.post(
+        '/api/v1/speech/translate',
+        body: {
           'text': text,
           'source_language': sourceLanguage,
           'target_language': targetLanguage,
-        }),
+        },
       );
 
       if (response.statusCode == 200) {
