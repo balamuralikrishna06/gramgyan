@@ -47,6 +47,7 @@ dependencies:
   image_picker: ^1.2.1
   flutter_markdown: ^0.7.7+1
   timeago: ^3.7.1
+  device_info_plus: ^10.1.0
 
 dev_dependencies:
   flutter_test:

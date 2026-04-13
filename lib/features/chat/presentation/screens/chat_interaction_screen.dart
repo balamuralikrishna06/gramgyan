@@ -13,6 +13,8 @@ import '../../../../core/providers/language_provider.dart';
 import '../providers/smart_prediction_provider.dart';
 import '../widgets/soil_input_form.dart';
 import '../widgets/crop_result_card.dart';
+import '../../../../core/providers/connection_mode_provider.dart';
+import '../../../../core/services/ollama_service.dart';
 
 // ── Providers ──────────────────────────────────────────────────────────────
 
@@ -167,6 +169,18 @@ class _ChatInteractionScreenState
     }
   }
 
+  // ── Connection Status Guard ───────────────────────────────────────────
+
+  void _showOfflineVisionWarning() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('☁️ Vision requires Cloud Power. Switch to Online.'),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   // ── Send regular message ──────────────────────────────────────────────
 
   Future<void> _sendMessage() async {
@@ -193,10 +207,18 @@ class _ChatInteractionScreenState
     _scrollToBottom();
 
     try {
+      final isOnline = ref.read(connectionModeProvider);
       final geminiService = GeminiService();
+      final ollamaService = OllamaService();
       String responseText = '';
 
       if (imageToAnalyze != null) {
+        if (!isOnline) {
+          _showOfflineVisionWarning();
+          ref.read(isChatProcessingProvider.notifier).state = false;
+          return;
+        }
+
         final userLangCode = ref.read(languageProvider);
         final userLangName = GeminiService.langCodeToName(userLangCode);
         final query =
@@ -221,8 +243,29 @@ class _ChatInteractionScreenState
       } else {
         final userLangCode = ref.read(languageProvider);
         final userLangName = GeminiService.langCodeToName(userLangCode);
-        responseText =
-            await geminiService.generateAnswer(text, language: userLangName);
+        
+        if (isOnline) {
+          responseText = await geminiService.generateAnswer(text, language: userLangName);
+        } else {
+          try {
+            responseText = await ollamaService.generateLlamaAnswer(text, language: userLangName);
+          } catch (e) {
+             if (e.toString().contains('OFFLINE_SERVER_NOT_FOUND')) {
+               if (mounted) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(
+                     content: Text('⚠️ Local AI Server not found. Ensure laptop is on the same hotspot.'),
+                     backgroundColor: Colors.orange,
+                     behavior: SnackBarBehavior.floating,
+                   ),
+                 );
+               }
+               responseText = 'Error: Local AI is unreachable. Please toggle to Online mode or check your connection.';
+             } else {
+               rethrow;
+             }
+          }
+        }
       }
 
       final aiMsg = ChatMessage(text: responseText, isUser: false);
@@ -302,6 +345,37 @@ class _ChatInteractionScreenState
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: Consumer(
+              builder: (context, ref, child) {
+                final isOnline = ref.watch(connectionModeProvider);
+                return IconButton(
+                  onPressed: () {
+                    ref.read(connectionModeProvider.notifier).state = !isOnline;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isOnline 
+                            ? 'Switched to LOCAL AI (Ollama) 🖥️' 
+                            : 'Switched to CLOUD AI (Gemini) ☁️',
+                        ),
+                        duration: const Duration(seconds: 1),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    isOnline ? Icons.cloud_done : Icons.cloud_off,
+                    color: isOnline ? AppColors.primary : Colors.orange,
+                  ),
+                  tooltip: isOnline ? 'Online Mode (Gemini)' : 'Offline Mode (Ollama)',
+                );
+              },
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
