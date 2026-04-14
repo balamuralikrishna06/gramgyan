@@ -22,22 +22,18 @@ class _GyanCallSheetState extends State<GyanCallSheet> {
   final _phoneController = TextEditingController();
   bool _isLoading = false;
 
-  static final _lines = [
+  static const _lines = [
     _CallLine(
       label: 'Line 1',
       subLabel: 'Expert Support',
       number: '+1 839-261-6941',
-      endpoint: AppConstants.gyanCallLine1Endpoint,
-      to: AppConstants.gyanCallLine1To,
-      accountSid: AppConstants.gyanCallLine1Sid,
+      lineId: 1,
     ),
     _CallLine(
       label: 'Line 2',
       subLabel: 'Alternate Support',
       number: '+1 582-282-0653',
-      endpoint: AppConstants.gyanCallLine2Endpoint,
-      to: AppConstants.gyanCallLine2To,
-      accountSid: AppConstants.gyanCallLine2Sid,
+      lineId: 2,
     ),
   ];
 
@@ -60,14 +56,11 @@ class _GyanCallSheetState extends State<GyanCallSheet> {
     try {
       final response = await http
           .post(
-            Uri.parse(line.endpoint),
+            Uri.parse('${AppConstants.backendPrimaryUrl}/api/v1/gyancall/trigger'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'From': phone,
-              'To': line.to,
-              'CallSid': 'CA123456789example',
-              'Direction': 'inbound',
-              'AccountSid': line.accountSid,
+              'phone': phone,
+              'line': line.lineId,
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -350,17 +343,13 @@ class _CallLine {
   final String label;
   final String subLabel;
   final String number;
-  final String endpoint;
-  final String to;
-  final String accountSid;
+  final int lineId;
 
   const _CallLine({
     required this.label,
     required this.subLabel,
     required this.number,
-    required this.endpoint,
-    required this.to,
-    required this.accountSid,
+    required this.lineId,
   });
 }
 

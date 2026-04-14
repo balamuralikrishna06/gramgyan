@@ -153,7 +153,7 @@ class ReportRepository {
       String? aiReason;
       try {
         if (textToProcess.isNotEmpty) {
-           debugPrint('Starting AI Safety Check. Key prefix: ${AppConstants.geminiApiKey.substring(0, 5)}...');
+           debugPrint('Starting AI Safety Check...');
           final safetyResult = await _geminiService.checkSafety(textToProcess);
           aiFlagged = !safetyResult.isSafe;
           aiReason = safetyResult.reason;
