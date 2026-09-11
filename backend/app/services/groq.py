@@ -49,7 +49,7 @@ config = get_settings()
 logger = logging.getLogger(__name__)
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-20b"
 
 def _get_api_keys() -> list[str]:
     keys = []
